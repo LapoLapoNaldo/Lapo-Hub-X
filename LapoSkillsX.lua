@@ -7,7 +7,6 @@ local RemoteFolder = ReplicatedStorage:WaitForChild("Remote")
 local AbilityRemote = RemoteFolder:WaitForChild("UnitAbility")
 local WorkspaceUnits = Workspace:WaitForChild("Units")
 
--- Carrega a nova biblioteca LapoHub X (tenta ler localmente primeiro para desenvolvimento/correções)
 local LapoHub
 local success, err = pcall(function()
     return loadstring(readfile("Library.lua"))()
@@ -30,14 +29,14 @@ LapoHub:Init({
 
 LapoHub:SetUser("LapoLapoNaldo", "Lapo Newba")
 
--- Estado
 local selectedUnit, selectedSkill
 local starkeiTarget
 local autoUse = false
 local autoStarkei = false
+local autoUseGen = 0
+local autoStarkeiGen = 0
 local UnitDropdown, SkillDropdown, StarkeiTargetDropdown
 
--- Utils
 local function IsOwnedUnit(instance)
     local info = instance:FindFirstChild("Info")
     local owner = info and info:FindFirstChild("Owner")
@@ -48,8 +47,8 @@ local function GetPlayerUnits()
     local list = {}
     if WorkspaceUnits then
         for _, unit in ipairs(WorkspaceUnits:GetChildren()) do
-            if IsOwnedUnit(unit) then 
-                table.insert(list, unit.Name) 
+            if IsOwnedUnit(unit) then
+                table.insert(list, unit.Name)
             end
         end
     end
@@ -74,8 +73,7 @@ end
 local function LoadActiveSkills()
     local loadedSkills = {}
     local seenSkills = {}
-    
-    -- 1. Método: Tentar extrair do Abilities_Data via debug.getupvalue (super rápido se disponível)
+
     local abilitiesDataModule = ReplicatedStorage:FindFirstChild("Modules")
         and ReplicatedStorage.Modules:FindFirstChild("UnitSystems")
         and ReplicatedStorage.Modules.UnitSystems:FindFirstChild("Stats")
@@ -101,7 +99,6 @@ local function LoadActiveSkills()
         end
     end
 
-    -- 2. Método: Iterar sobre todas as Units no game ReplicatedStorage (Seguro e dinâmico)
     local UnitsFolder = ReplicatedStorage:FindFirstChild("Modules")
         and ReplicatedStorage.Modules:FindFirstChild("UnitSystems")
         and ReplicatedStorage.Modules.UnitSystems:FindFirstChild("Stats")
@@ -117,13 +114,13 @@ local function LoadActiveSkills()
                     end
                     return required
                 end)
-                
-                if ok and type(result) == "table" and result.Status then
+
+                if ok and type(result) == "table" and type(result.Status) == "table" then
                     for _, status in ipairs(result.Status) do
-                        local passive = status.Passive
-                        if passive and (passive.Type == "Manual" and passive.Skills ~= nil) then
+                        local passive = type(status) == "table" and status.Passive
+                        if passive and passive.Type == "Manual" and type(passive.Skills) == "table" then
                             for _, skillInfo in ipairs(passive.Skills) do
-                                local skillName = skillInfo.Skill or passive.Name
+                                local skillName = (type(skillInfo) == "table" and skillInfo.Skill) or passive.Name
                                 if skillName and not seenSkills[skillName] then
                                     seenSkills[skillName] = true
                                     table.insert(loadedSkills, skillName)
@@ -135,16 +132,12 @@ local function LoadActiveSkills()
             end
         end
     end
-    
+
     table.sort(loadedSkills)
     return loadedSkills
 end
 
--- Inicializa lista de skills
-local AllSkills = LoadActiveSkills()
-if #AllSkills == 0 then
-    AllSkills = {"Nenhuma skill encontrada"}
-end
+local AllSkills = {"Nenhuma skill encontrada"}
 local allUnits = GetPlayerUnits()
 
 if #allUnits > 0 then
@@ -159,14 +152,14 @@ end
 local function RefreshAllDropdowns()
     allUnits = GetPlayerUnits()
     local uniqueUnits = UniqueList(allUnits)
-    
+
     if UnitDropdown then
         UnitDropdown:Set(uniqueUnits)
     end
     if StarkeiTargetDropdown then
         StarkeiTargetDropdown:Set(uniqueUnits)
     end
-    
+
     LapoHub:Notify({ title = "Atualizar Unidades", content = "Encontradas " .. #uniqueUnits .. " unidades!", duration = 2 })
 end
 
@@ -178,6 +171,7 @@ local function RefreshGameSkills()
     if SkillDropdown then
         SkillDropdown:Set(AllSkills)
     end
+    selectedSkill = AllSkills[1]
     LapoHub:Notify({ title = "Skills Carregadas", content = "Puxadas " .. #AllSkills .. " skills ativas do jogo!", duration = 3 })
 end
 
@@ -190,15 +184,13 @@ local function FireAbility(unitName, skillName)
     if not unit then return false, "Unidade não encontrada no mapa" end
     local owner = unit:FindFirstChild("Info") and unit.Info:FindFirstChild("Owner")
     if not (owner and owner.Value == LocalPlayer.Name) then return false, "Esta unidade não te pertence" end
-    
+
     local ok, err = pcall(function()
         AbilityRemote:FireServer(skillName, unit)
     end)
     if not ok then return false, tostring(err) end
     return true
 end
-
--- ====== CONSTRUÇÃO DA INTERFACE ======
 
 LapoHub:AddButton("Auto Habilidades", {
     text = "🔄 Atualizar Unidades",
@@ -230,6 +222,7 @@ LapoHub:AddTextBox("Auto Habilidades", {
         local q = string.lower(text or "")
         if q == "" then
             if SkillDropdown then SkillDropdown:Set(AllSkills) end
+            selectedSkill = AllSkills[1]
             return
         end
         local filtered = {}
@@ -242,6 +235,7 @@ LapoHub:AddTextBox("Auto Habilidades", {
             filtered = {"(sem correspondência)"}
         end
         if SkillDropdown then SkillDropdown:Set(filtered) end
+        selectedSkill = filtered[1]
     end
 })
 
@@ -254,6 +248,17 @@ SkillDropdown = LapoHub:AddDropdown("Auto Habilidades", {
     end
 })
 
+task.spawn(function()
+    task.wait()
+    local s = LoadActiveSkills()
+    if #s > 0 then
+        AllSkills = s
+        if SkillDropdown then SkillDropdown:Set(AllSkills) end
+        selectedSkill = AllSkills[1]
+    end
+    LapoHub:Notify({ title = "Lapo Hub X - Habilidades", content = "Carregadas " .. #AllSkills .. " skills.", duration = 4 })
+end)
+
 LapoHub:AddToggle("Auto Habilidades", {
     text = "Auto Usar Habilidade Selecionada",
     default = false,
@@ -261,8 +266,10 @@ LapoHub:AddToggle("Auto Habilidades", {
         autoUse = state
         if state then
             LapoHub:Notify({ title = "Auto Skill", content = "Iniciado (loop a cada 1s)", duration = 3 })
+            autoUseGen = autoUseGen + 1
+            local myGen = autoUseGen
             task.spawn(function()
-                while autoUse do
+                while autoUse and myGen == autoUseGen do
                     if selectedUnit and selectedSkill and selectedSkill ~= "None" and selectedSkill ~= "(sem correspondência)" and selectedSkill ~= "(no match)" then
                         local ok, err = FireAbility(selectedUnit, selectedSkill)
                         if not ok and err then
@@ -346,8 +353,10 @@ LapoHub:AddToggle("Funções Starkei", {
         autoStarkei = state
         if state then
             LapoHub:Notify({ title = "Auto Starkei", content = "Iniciado (loop a cada 1s)", duration = 3 })
+            autoStarkeiGen = autoStarkeiGen + 1
+            local myGen = autoStarkeiGen
             task.spawn(function()
-                while autoStarkei do
+                while autoStarkei and myGen == autoStarkeiGen do
                     if starkeiTarget and starkeiTarget ~= "None" then
                         local ok, err = FireAbility(starkeiTarget, "Savior of the AWTD")
                         if not ok and err then
@@ -396,10 +405,6 @@ LapoHub:AddButton("Funções Starkei", {
         end
     end
 })
-
--- ================================================================
--- ==================== TAB: RESENHA ==============================
--- ================================================================
 
 local function GetEquippedUnits()
     local party = LocalPlayer:FindFirstChild("Data") and LocalPlayer.Data:FindFirstChild("Party")
@@ -474,7 +479,7 @@ LapoHub:AddButton("Resenha", {
             LapoHub:Notify({ title = "Erro", content = "Escolha uma unit válida primeiro!", duration = 3 })
             return
         end
-        
+
         local character = LocalPlayer.Character
         local hrp = character and character:FindFirstChild("HumanoidRootPart")
         if not hrp then
@@ -483,8 +488,7 @@ LapoHub:AddButton("Resenha", {
         end
 
         local originalPos = hrp.Position
-        
-        -- Teleporta para o céu
+
         local okTeleport, errTeleport = pcall(function()
             hrp.CFrame = CFrame.new(originalPos.X, spawnAltura, originalPos.Z)
         end)
@@ -492,16 +496,15 @@ LapoHub:AddButton("Resenha", {
             LapoHub:Notify({ title = "Erro Teleporte", content = tostring(errTeleport), duration = 3 })
             return
         end
-        
+
         task.wait(0.2)
-        
-        -- Invoca o spawn
+
         local spawnRemote = RemoteFolder:FindFirstChild("SpawnUnit")
         if not spawnRemote then
             LapoHub:Notify({ title = "Erro", content = "SpawnUnit remoto não encontrado!", duration = 3 })
             return
         end
-        
+
         local okSpawn, errSpawn = pcall(function()
             local args = {
                 selectedResenhaUnit,
@@ -511,14 +514,13 @@ LapoHub:AddButton("Resenha", {
             }
             spawnRemote:InvokeServer(unpack(args))
         end)
-        
+
         if not okSpawn then
             LapoHub:Notify({ title = "Erro Spawn", content = tostring(errSpawn), duration = 3 })
         else
             LapoHub:Notify({ title = "Sucesso", content = "Unit " .. selectedResenhaUnit .. " spawnada!", duration = 3 })
         end
-        
-        -- Se estiver ativado, retorna para a posição original
+
         if returnToOriginalPos then
             task.wait(0.1)
             pcall(function()
@@ -534,6 +536,3 @@ LapoHub:AddParagraph("Resenha", { text = "• Este recurso simula o posicionamen
 LapoHub:AddParagraph("Resenha", { text = "• O spawn ocorre na posição X e Z atual do jogador, mas na altura Y definida." })
 LapoHub:AddParagraph("Resenha", { text = "• A altura recomendada (2147483775) posiciona a unidade muito acima do mapa, ideal para certas finalidades/glitches." })
 LapoHub:AddParagraph("Resenha", { text = "• Ative 'Retornar à Posição Original' para voltar ao solo imediatamente após o spawn." })
-
--- Notificação inicial
-LapoHub:Notify({ title = "Lapo Hub X - Habilidades", content = "Script inicializado! Carregadas " .. #AllSkills .. " skills.", duration = 4 })
