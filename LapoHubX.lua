@@ -27,7 +27,6 @@ LapoHub:SetUserCallback(function(n, r)
     LapoHub:Notify({ title = "User", content = n .. " • " .. r, duration = 3 })
 end)
 
--- ====== SERVICES ======
 local Players  = game:GetService("Players")
 local RS       = game:GetService("ReplicatedStorage")
 local HttpSvc  = game:GetService("HttpService")
@@ -35,11 +34,9 @@ local LP       = Players.LocalPlayer
 local UIS      = game:GetService("UserInputService")
 local Remote   = RS:WaitForChild("Remote")
 
--- ====== GLOBALS ======
 local WEBHOOK_LOGS_ENABLED = false
 local SendWebhook = function() return false end
 
--- ====== HELPERS ======
 local function SafeInvoke(remote, ...)
     local args = {...}
     local ok, result = pcall(function()
@@ -56,12 +53,9 @@ local function SafeFire(remote, ...)
     end)
 end
 
--- ====== DATA READING ======
-
 local cachedUnitsData = {}
 local dataVersion = 0
 
--- GetReturnData (for stats, limit break, etc.)
 local function GetReturnData()
     local remote = Remote:FindFirstChild("ReturnData")
     if remote then
@@ -80,10 +74,8 @@ local function forceReadUnits()
     return cachedUnitsData
 end
 
--- Initialize units data
 forceReadUnits()
 
--- ====== TRAIT DATA ======
 local TraitData = {
     ["Strength"]        = { Rarity = "R",  Desc = "+10% ATK" },
     ["Swiftness"]       = { Rarity = "R",  Desc = "-5% SPA" },
@@ -114,10 +106,6 @@ local TRAIT_NAMES = {
 
 local BEST_TRAITS = { ["The Honored One"]=true, ["The Fallen One"]=true, ["Assassin"]=true, ["Divine Treasure"]=true }
 
--- ================================================================
--- ==================== TAB: STATS VIEWER ========================
--- ================================================================
-
 LapoHub:AddLabel("📊 Stats", { text = "📊 Visualizar Stats" })
 
 local function convertStat(statName, value)
@@ -131,10 +119,10 @@ local function convertStat(statName, value)
     return value
 end
 
-local statsData = GetReturnData()
+local statsData = next(cachedUnitsData) and { Units = cachedUnitsData } or nil
 local statsUnits = {}
-if statsData and statsData.Units then
-    for name,_ in pairs(statsData.Units) do table.insert(statsUnits, name) end
+if statsData then
+    for name in pairs(cachedUnitsData) do table.insert(statsUnits, name) end
     table.sort(statsUnits)
 end
 
@@ -149,12 +137,12 @@ local function IsEmptyTable(t)
 end
 
 local function refreshStatsDisplay()
-    local data = GetReturnData()
-    if not data then
+
+    local units = cachedUnitsData
+    if not units or IsEmptyTable(units) then
         statsInfoLabels[1]:updateText("Erro ao carregar dados.")
         return
     end
-    local units = data.Units or {}
     local unit = units[statsSelectedUnit]
     if not unit then
         statsInfoLabels[1]:updateText("Nenhuma info para " .. statsSelectedUnit)
@@ -177,12 +165,11 @@ local function refreshStatsDisplay()
         table.insert(lines, "Traits: " .. table.concat(unit.Traits, ", "))
     end
 
-    -- 2. Display all other raw data, excluding what was already shown
     local shownKeys = {
         Upgrade=true, LimitBreak=true, Limit=true, LimitLevel=true, BreakLevel=true,
         Modifiers=true, Mods=true, Trait=true, Traits=true, TraitsList=true, SelectedTrait=true
     }
-    
+
     local otherKeys = {}
     for k in pairs(unit) do
         if not shownKeys[k] then
@@ -230,17 +217,20 @@ _statsDropdown = LapoHub:AddDropdown("📊 Stats", {
 LapoHub:AddButton("📊 Stats", {
     text = "🔄 Atualizar Dados",
     callback = function()
-        local newData = GetReturnData()
-        if not newData then
+        local verBefore = dataVersion
+        forceReadUnits()
+        if dataVersion == verBefore then
             LapoHub:Notify({ title="Stats", content="Falha ao atualizar", duration=3 })
             return
         end
+        local newData = { Units = cachedUnitsData }
         statsData = newData
         statsUnits = {}
         for name,_ in pairs(newData.Units or {}) do table.insert(statsUnits, name) end
         table.sort(statsUnits)
         _statsDropdown:Set(statsUnits)
         if statsSelectedUnit and newData.Units[statsSelectedUnit] then
+            _statsDropdown:Set(statsSelectedUnit)
             refreshStatsDisplay()
         else
             statsSelectedUnit = statsUnits[1]
@@ -260,9 +250,6 @@ end
 if statsSelectedUnit and statsData and statsData.Units and statsData.Units[statsSelectedUnit] then
     refreshStatsDisplay()
 end
--- ================================================================
--- ==================== TAB: SIDE QUESTS =========================
--- ================================================================
 
 LapoHub:AddLabel("📋 Quests", { text = "📋 Missões Secundárias" })
 
@@ -325,10 +312,6 @@ end
 
 LapoHub:AddSeparator("📋 Quests")
 
--- ================================================================
--- ==================== TAB: LIMIT BREAK =========================
--- ================================================================
-
 LapoHub:AddLabel("⬆ Limit Break", { text = "⬆ Limit Break" })
 
 local lbUnits = { "Vending Machine","Stone Doctor","Shining Star Idol","Investigator",
@@ -343,9 +326,8 @@ local lbInfoLabel = LapoHub:AddLabel("⬆ Limit Break", { text = "Info: -" })
 local lbPerfectLabel = LapoHub:AddLabel("⬆ Limit Break", { text = "Perfect: 0/0" })
 
 local function updateLBInfo(unitName)
-    local data = GetReturnData()
-    if not data then lbInfoLabel:updateText("Info: N/A"); return end
-    local u = (data.Units or {})[unitName]
+
+    local u = cachedUnitsData[unitName]
     if not u then lbInfoLabel:updateText("Info: N/A"); return end
     local lbVal = u.LimitBreak or u.Limit or u.LimitLevel or u.BreakLevel or "N/A"
     lbInfoLabel:updateText("LB: " .. tostring(lbVal))
@@ -452,10 +434,6 @@ LapoHub:AddButton("⬆ Limit Break", {
 
 LapoHub:AddSeparator("⬆ Limit Break")
 
--- ================================================================
--- ==================== TAB: BANNERS =============================
--- ================================================================
-
 LapoHub:AddLabel("🎁 Banners", { text = "🎁 Banners" })
 
 local bannerList = {
@@ -498,6 +476,8 @@ local function makeBannerUI(sectionName, banners)
 
     local selBanner = banners[1]
     local spinMode = "1x"
+    local autoRollOn = false
+    local autoRollRunning = false
 
     local reqLabel = LapoHub:AddLabel("🎁 Banners", { text = "Requisito: " .. (selBanner.Req or "-") })
 
@@ -538,10 +518,12 @@ local function makeBannerUI(sectionName, banners)
         text = "🔄 Auto-Roll",
         default = false,
         callback = function(state)
+            autoRollOn = state
             if not state then return end
+            if autoRollRunning then return end
+            autoRollRunning = true
             task.spawn(function()
-                while true do
-                    if not state then break end
+                while autoRollOn do
                     local amount = (spinMode == "10x") and 2 or 1
                     if selBanner.Type == "Gacha" then
                         SafeInvoke(Remote:WaitForChild("Gacha"), amount == 1 and 1 or 10, selBanner.Triggers[amount])
@@ -550,6 +532,7 @@ local function makeBannerUI(sectionName, banners)
                     end
                     task.wait(2)
                 end
+                autoRollRunning = false
             end)
         end,
     })
@@ -559,10 +542,6 @@ makeBannerUI("— Banners Padrão", bannerList)
 LapoHub:AddSeparator("🎁 Banners")
 makeBannerUI("— Banners de Evento", eventBannerList)
 LapoHub:AddSeparator("🎁 Banners")
-
--- ================================================================
--- ==================== TAB: STAGES & ABYSS ======================
--- ================================================================
 
 LapoHub:AddLabel("🗺 Stages", { text = "🗺 Estágios & Abyss" })
 
@@ -663,10 +642,6 @@ LapoHub:AddButton("🗺 Stages", {
 
 LapoHub:AddSeparator("🗺 Stages")
 
--- ================================================================
--- ==================== TAB: TRAITS ==============================
--- ================================================================
-
 LapoHub:AddLabel("🎲 Traits", { text = "🎲 Rolador de Traits" })
 
 local RR_TYPES = { "Random", "SuperRandom" }
@@ -739,12 +714,12 @@ local _traitUnitDropdown
 local refreshTokenLabel = LapoHub:AddLabel("🎲 Traits", { text = "Spirit: -- | Secret: -- | Celestial: -- | Super: --" })
 
 local function updateTokenDisplay()
-    local ok, mats = pcall(function() return HttpSvc:JSONDecode(dataFolder:WaitForChild("OwnedMaterials",5).Value) end)
-    local ok2, items = pcall(function() return HttpSvc:JSONDecode(dataFolder:WaitForChild("OwnedItems",5).Value) end)
-    local m = ok and mats or {}
-    local i = ok2 and items or {}
+
+    local data = GetReturnData() or {}
+    local i = (type(data.Items) == "table" and data.Items) or {}
+    local m = (type(data.Materials) == "table" and data.Materials) or {}
     refreshTokenLabel:updateText(string.format("💎 Spirit:%s | Secret:%s | Celestial:%s | Super:%s",
-        tostring(m["Spirit"] or 0), tostring(m["Secret Crystal"] or 0),
+        tostring(m["Spirit"] or i["Spirit"] or 0), tostring(m["Secret Crystal"] or i["Secret Crystal"] or 0),
         tostring(i["Celestial Crystal"] or 0), tostring(i["Super Celestial Crystal"] or 0)))
 end
 
@@ -1036,10 +1011,6 @@ LapoHub:AddToggle("🎲 Traits", {
 
 LapoHub:AddSeparator("🎲 Traits")
 
--- ================================================================
--- ==================== TAB: SKINS ===============================
--- ================================================================
-
 LapoHub:AddLabel("👕 Skins", { text = "👕 Loja de Skins" })
 
 local SkinsData = {}
@@ -1099,10 +1070,6 @@ else
 end
 
 LapoHub:AddSeparator("👕 Skins")
-
--- ================================================================
--- ==================== TAB: WEBHOOK =============================
--- ================================================================
 
 LapoHub:AddLabel("🔗 Webhook", { text = "🔗 Webhook Settings" })
 
@@ -1298,7 +1265,6 @@ LapoHub:AddToggle("🔗 Webhook", {
     end,
 })
 
--- Hook remotes for logs
 local oldInvoke = SafeInvoke
 SafeInvoke = function(remote, ...)
     local args = {...}
@@ -1313,7 +1279,7 @@ SafeInvoke = function(remote, ...)
                 local atk = tonumber(mods.ATK) or 1
                 local sta = tonumber(mods.STA) or 1
                 local cost = tonumber(mods.COST) or 1
-                
+
                 local function formatStat(name, x)
                     local v = tonumber(x) or 1
                     if math.abs(v - 1.5) < 0.01 then
@@ -1374,7 +1340,7 @@ SafeFire = function(remote, ...)
             local atk = tonumber(mods.ATK) or 1
             local sta = tonumber(mods.STA) or 1
             local cost = tonumber(mods.COST) or 1
-            
+
             local function formatStat(name, x)
                 local v = tonumber(x) or 1
                 if math.abs(v - 1.5) < 0.01 then
@@ -1404,9 +1370,6 @@ SafeFire = function(remote, ...)
 end
 
 LapoHub:AddSeparator("🔗 Webhook")
--- ================================================================
--- ==================== INIT =====================================
--- ================================================================
 
 updateTokenDisplay()
 if selectedUnit and selectedUnit ~= "Nenhuma unit encontrada" then
