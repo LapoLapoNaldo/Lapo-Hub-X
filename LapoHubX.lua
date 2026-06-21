@@ -641,6 +641,28 @@ LapoHub:AddButton("🗺 Stages", {
 })
 
 LapoHub:AddSeparator("🗺 Stages")
+LapoHub:AddLabel("🗺 Stages", { text = "⭐ StarPath" })
+
+local starPathNode = 1
+
+LapoHub:AddDropdown("🗺 Stages", {
+    text = "Node",
+    options = {"1", "2", "3"},
+    default = 1,
+    callback = function(_, value)
+        starPathNode = tonumber(value)
+    end,
+})
+
+LapoHub:AddButton("🗺 Stages", {
+    text = "⭐ Ir para Node",
+    callback = function()
+        local ok = SafeFire(Remote.StarPath, "Attempt", {["Node"] = starPathNode})
+        if not ok then LapoHub:Notify({ title="StarPath Error", content="Falha ao ir para StarPath", duration=4 }) end
+    end,
+})
+
+LapoHub:AddSeparator("🗺 Stages")
 
 LapoHub:AddLabel("🎲 Traits", { text = "🎲 Rolador de Traits" })
 
