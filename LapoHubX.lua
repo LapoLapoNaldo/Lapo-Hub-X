@@ -448,6 +448,7 @@ local bannerList = {
     {Name="Skin Banner",          Type="Gacha", Triggers={[1]="Skin Banner",[2]="Skin Banner"}, Req="Puzzle"},
     {Name="Skin Banner2",         Type="Gacha", Triggers={[1]="Skin Banner2",[2]="Skin Banner2"}, Req="Puzzle"},
     {Name="Skin Banner3",         Type="Gacha", Triggers={[1]="Skin Banner3",[2]="Skin Banner3"}, Req="Puzzle"},
+    {Name="Dragon Heart",         Type="Gacha", Triggers={[1]="Dragon Heart",[2]="Dragon Heart"}, Req="Puzzle"},
 }
 
 local eventBannerList = {
@@ -546,40 +547,71 @@ LapoHub:AddSeparator("🎁 Banners")
 LapoHub:AddLabel("🗺 Stages", { text = "🗺 Estágios & Abyss" })
 
 local stages = {
-    {Display="Dragon Kingdom",       Trigger="Dragon Kingdom"},
-    {Display="Crossover City",       Trigger="Crossover City"},
-    {Display="Valentine Kingdom",    Trigger="Valentine Kingdom"},
-    {Display="Shadow Realm II",      Trigger="Shadow Realm II"},
-    {Display="Phantom Parade",       Trigger="Phantom Parade"},
-    {Display="Fishman Island",       Trigger="Fishman Island"},
-    {Display="Christmas Mansion",    Trigger="Christmas Mansion"},
-    {Display="Halloween Town",       Trigger="Halloween Town"},
-    {Display="Execution Base",       Trigger="Execution Base"},
-    {Display="Kujaku House",         Trigger="Kujaku House"},
-    {Display="Pinky Island",         Trigger="Pinky Island"},
-    {Display="Nyx Avatar",           Trigger="The Death Avatar"},
-    {Display="Forbidden Graveyard",  Trigger="Forbidden Graveyard"},
-    {Display="Dessert Witch",        Trigger="Dessert Witch"},
+    "The Fascinating Horizon","The Fascinating Horizon EX",
+    "Shadow Realm[Destroyed]","Shadow Realm[Destroyed] EX",
+    "Collapsed Camelot","Dark Future","Dark Future EX",
+    "Gold Rush","Gold Rush EX","Crystal Cave","Crystal Cave EX",
+    "Blue Element","Green Element","Yellow Element","Red Element","Purple Element",
+    "To be Hokage_Skip","Dragon Orb_Skip","East Island_Skip","Peace Symbol_Skip",
+    "Katamura Danger_Skip","Demon Sister_Skip","Jo-Mission_Skip","Chainsaw Devil_Skip",
+    "Arranca Invation_Skip","Sorcerer School_Skip","String Kingdom_Skip",
+    "Ruin Leaf Village_Skip","Esper City_Skip",
+    "Pinky Island","Summer Island","Summer Beach Dungeon","Halloween Town",
+    "Christmas Mansion","Crossover City","Valentine Kingdom","Dragon Kingdom",
+    "Phantom Parade","Fishman Island","Forbidden Graveyard","Dessert Witch",
+    "Boss Rush","The Rumbling","Fairy Camelot","Anniversary Park","Easter Academy",
+    "Island of Snipers","Work Field","Training Field","Metal Rush","Charuto Bridge",
+    "Exploding Planet","Kriezer Super Boss","Evil Pink Dungeon","Idol Concert",
+    "MarineFord Raid","Hero City Raid","Spider MT. Raid","Kujaku House",
+    "Katamura City Raid","Mirror World","Pillar Cave","Katana Revenge","Soul Hall",
+    "Ruin Society","String Kingdom","Esper City","Execution Base","Chaos Return",
+    "Shadow Realm","Shadow Realm II","The Death Avatar","Tomb of the Star",
+    "Shinjuku Showdown","Sukuna Showdown","Dream Island","Shinobi Battleground",
+    "Victory Valley","Paradox Invasion","Belial","The Eclipse","Android Future",
+    "God Mission","Z Game",
 }
 
 local difficulties = {"Normal","Hard","Insane","Nightmare","Master","Unique"}
 local methods = {"Criar Sala (Com Amigos)", "Teleporte Solo"}
 
-local stageNames = {}
-for _, s in ipairs(stages) do stageNames[#stageNames+1] = s.Display end
+local filteredStages = {}
+for _, s in ipairs(stages) do table.insert(filteredStages, s) end
 
-local selStageTrigger = stages[1].Trigger
+local selStage     = stages[1]
 local selDifficulty = difficulties[1]
-local selMethod = methods[1]
+local selMethod    = methods[1]
+local filterText   = ""
 
-LapoHub:AddDropdown("🗺 Stages", {
+local stageCountLabel = LapoHub:AddLabel("🗺 Stages", { text = "Estágios: " .. #stages })
+
+local _stageDd
+_stageDd = LapoHub:AddDropdown("🗺 Stages", {
     text = "Selecionar Estágio",
-    options = stageNames,
+    options = filteredStages,
     default = 1,
-    callback = function(_, value)
-        for _, s in ipairs(stages) do
-            if s.Display == value then selStageTrigger = s.Trigger; break end
+    callback = function(_, value) selStage = value end,
+})
+
+local function ApplyFilter()
+    filteredStages = {}
+    local q = string.lower(filterText)
+    for _, name in ipairs(stages) do
+        if q == "" or string.find(string.lower(name), q, 1, true) then
+            table.insert(filteredStages, name)
         end
+    end
+    if #filteredStages == 0 then filteredStages = {"Sem resultado"} end
+    _stageDd:Set(filteredStages)
+    selStage = filteredStages[1]
+    stageCountLabel:updateText("Estágios: " .. #filteredStages .. "/" .. #stages)
+end
+
+LapoHub:AddTextBox("🗺 Stages", {
+    text = "Filtrar por nome",
+    placeholder = "ex: Shadow...",
+    callback = function(value)
+        filterText = value or ""
+        ApplyFilter()
     end,
 })
 
@@ -600,19 +632,23 @@ LapoHub:AddDropdown("🗺 Stages", {
 LapoHub:AddButton("🗺 Stages", {
     text = "▶ Ir para Estágio",
     callback = function()
+        if selStage == "Sem resultado" then
+            LapoHub:Notify({ title="Stage", content="Stage inválido", duration=3 })
+            return
+        end
         local ok
         if selMethod == methods[1] then
             ok = SafeFire(Remote:WaitForChild("CreateRoom"), {
-                ["StageSelect"] = selStageTrigger,
+                ["StageSelect"] = selStage,
                 ["Image"] = "rbxassetid://9617217504",
                 ["FriendOnly"] = false,
                 ["Difficult"] = selDifficulty,
             })
         else
-            ok = SafeFire(Remote.TeleportToStage, selStageTrigger)
+            ok = SafeFire(Remote.TeleportToStage, selStage)
         end
         if not ok then LapoHub:Notify({ title="Stage Error", content="Falha ao teleportar", duration=4 })
-        else LapoHub:Notify({ title="Stage", content="Teleportando...", duration=3 }) end
+        else LapoHub:Notify({ title="Stage", content="Teleportando para " .. selStage .. "...", duration=3 }) end
     end,
 })
 
@@ -1007,7 +1043,7 @@ LapoHub:AddToggle("🎲 Traits", {
                     local found = false
                     for attempt = 1, maxAttempts do
                         if not autoRolling then break end
-                        local result = SafeInvoke(Remote:WaitForChild("traitRemote"), "SuperRandom", unitName)
+                        local result = SafeInvoke(Remote:WaitForChild("traitRemote"), selectedRRType, unitName)
                         if result then
                             local rolled = type(result) == "table" and result[1] or result
                             if type(rolled) == "string" and BEST_TRAITS[rolled] then
