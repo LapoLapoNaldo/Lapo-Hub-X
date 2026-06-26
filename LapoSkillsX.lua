@@ -17,6 +17,13 @@ else
     LapoHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/LapoLapoNaldo/Lapo-X/refs/heads/main/Library.lua"))()
 end
 
+LapoHub:ShowLoading({
+    Title    = "Lapo Hub X",
+    Subtitle = "Habilidades",
+    Message  = "Inicializando...",
+    Image  = "https://i.imgur.com/NUNZ9zX.jpeg",
+})
+
 LapoHub:AddTab("Auto Habilidades", "")
 LapoHub:AddTab("Skills Rápidas", "")
 LapoHub:AddTab("Funções Starkei", "")
@@ -26,6 +33,7 @@ LapoHub:Init({
     Title     = "Lapo Hub X - Habilidades",
     ToggleKey = "K",
 })
+LapoHub:SetLoadingProgress(0.2, "Carregando unidades...")
 
 LapoHub:SetUser("LapoLapoNaldo", "Lapo Newba")
 
@@ -327,6 +335,7 @@ for _, skill in ipairs(BuffButtons) do
     })
 end
 
+LapoHub:SetLoadingProgress(0.55, "Carregando funções Starkei...")
 LapoHub:AddSeparator("Funções Starkei")
 LapoHub:AddLabel("Funções Starkei", { text = "💫 Funções de Suporte Starkei" })
 
@@ -430,6 +439,7 @@ local resenhaDropdown
 local spawnAltura = 2147483775
 local returnToOriginalPos = true
 
+LapoHub:SetLoadingProgress(0.8, "Carregando Resenha...")
 resenhaDropdown = LapoHub:AddDropdown("Resenha", {
     text = "Escolher Unit",
     options = resenhaUnits,
@@ -536,3 +546,11 @@ LapoHub:AddParagraph("Resenha", { text = "• Este recurso simula o posicionamen
 LapoHub:AddParagraph("Resenha", { text = "• O spawn ocorre na posição X e Z atual do jogador, mas na altura Y definida." })
 LapoHub:AddParagraph("Resenha", { text = "• A altura recomendada (2147483775) posiciona a unidade muito acima do mapa, ideal para certas finalidades/glitches." })
 LapoHub:AddParagraph("Resenha", { text = "• Ative 'Retornar à Posição Original' para voltar ao solo imediatamente após o spawn." })
+
+LapoHub:FinishLoading(function()
+    LapoHub:Notify({
+        title   = "⚡ Lapo Hub X",
+        content = "Habilidades carregado!",
+        duration = 4,
+    })
+end)
