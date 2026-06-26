@@ -27,7 +27,7 @@ LapoHub:ShowLoading({
 LapoHub:AddTab("Auto Habilidades", "")
 LapoHub:AddTab("Skills Rápidas", "")
 LapoHub:AddTab("Funções Starkei", "")
-LapoHub:AddTab("Resenha", "")
+LapoHub:AddTab("Sabor Inf Damage", "")
 
 LapoHub:Init({
     Title     = "Lapo Hub X - Habilidades",
@@ -439,8 +439,8 @@ local resenhaDropdown
 local spawnAltura = 2147483775
 local returnToOriginalPos = true
 
-LapoHub:SetLoadingProgress(0.8, "Carregando Resenha...")
-resenhaDropdown = LapoHub:AddDropdown("Resenha", {
+LapoHub:SetLoadingProgress(0.8, "Carregando Sabor Inf Damage...")
+resenhaDropdown = LapoHub:AddDropdown("Sabor Inf Damage", {
     text = "Escolher Unit",
     options = resenhaUnits,
     default = 1,
@@ -449,7 +449,7 @@ resenhaDropdown = LapoHub:AddDropdown("Resenha", {
     end
 })
 
-LapoHub:AddButton("Resenha", {
+LapoHub:AddButton("Sabor Inf Damage", {
     text = "🔄 Atualizar Party",
     callback = function()
         resenhaUnits = GetEquippedUnits()
@@ -457,11 +457,11 @@ LapoHub:AddButton("Resenha", {
             resenhaDropdown:Set(resenhaUnits)
         end
         selectedResenhaUnit = resenhaUnits[1]
-        LapoHub:Notify({ title = "Resenha", content = "Party atualizada!", duration = 2 })
+        LapoHub:Notify({ title = "Sabor Inf Damage", content = "Party atualizada!", duration = 2 })
     end
 })
 
-LapoHub:AddTextBox("Resenha", {
+LapoHub:AddTextBox("Sabor Inf Damage", {
     text = "Altura do Spawn (Y)",
     placeholder = "Padrão: 2147483775",
     callback = function(value)
@@ -474,7 +474,7 @@ LapoHub:AddTextBox("Resenha", {
     end
 })
 
-LapoHub:AddToggle("Resenha", {
+LapoHub:AddToggle("Sabor Inf Damage", {
     text = "Retornar à Posição Original",
     default = true,
     callback = function(state)
@@ -482,7 +482,7 @@ LapoHub:AddToggle("Resenha", {
     end
 })
 
-LapoHub:AddButton("Resenha", {
+LapoHub:AddButton("Sabor Inf Damage", {
     text = "🚀 Dar Place na Unit",
     callback = function()
         if not selectedResenhaUnit or selectedResenhaUnit == "Nenhuma unit na Party" then
@@ -540,12 +540,13 @@ LapoHub:AddButton("Resenha", {
     end
 })
 
-LapoHub:AddSeparator("Resenha")
-LapoHub:AddLabel("Resenha", { text = "ℹ️ Informações Úteis:" })
-LapoHub:AddParagraph("Resenha", { text = "• Este recurso simula o posicionamento de uma unidade da sua Party." })
-LapoHub:AddParagraph("Resenha", { text = "• O spawn ocorre na posição X e Z atual do jogador, mas na altura Y definida." })
-LapoHub:AddParagraph("Resenha", { text = "• A altura recomendada (2147483775) posiciona a unidade muito acima do mapa, ideal para certas finalidades/glitches." })
-LapoHub:AddParagraph("Resenha", { text = "• Ative 'Retornar à Posição Original' para voltar ao solo imediatamente após o spawn." })
+LapoHub:AddSeparator("Sabor Inf Damage")
+LapoHub:AddLabel("Sabor Inf Damage", { text = "REQUER UNIT COM AMBUSH!!!!:" })
+LapoHub:AddLabel("Sabor Inf Damage", { text = "ℹ️ Informações Úteis:" })
+LapoHub:AddParagraph("Sabor Inf Damage", { text = "• Este recurso simula o posicionamento de uma unidade da sua Party." })
+LapoHub:AddParagraph("Sabor Inf Damage", { text = "• O spawn ocorre na posição X e Z atual do jogador, mas na altura Y definida." })
+LapoHub:AddParagraph("Sabor Inf Damage", { text = "• A altura recomendada (2147483775) posiciona a unidade muito acima do mapa, ideal para certas finalidades/glitches." })
+LapoHub:AddParagraph("Sabor Inf Damage", { text = "• Ative 'Retornar à Posição Original' para voltar ao solo imediatamente após o spawn." })
 
 LapoHub:FinishLoading(function()
     LapoHub:Notify({
