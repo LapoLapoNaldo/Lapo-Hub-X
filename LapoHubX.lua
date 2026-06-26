@@ -8,6 +8,14 @@ else
     LapoHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/LapoLapoNaldo/Lapo-X/refs/heads/main/Library.lua"))()
 end
 
+
+LapoHub:ShowLoading({
+    Title    = "Lapo Hub X",
+    Subtitle = "by LapoLapoNaldo",
+    Message  = "Inicializando...",
+    Image  = "https://imgur.com/a/6TIqiJN",  
+})
+
 LapoHub:AddTab("📊 Stats", "")
 LapoHub:AddTab("📋 Quests", "")
 LapoHub:AddTab("⬆ Limit Break", "")
@@ -21,6 +29,7 @@ LapoHub:Init({
     Title     = "Lapo Hub X",
     ToggleKey = "K",
 })
+LapoHub:SetLoadingProgress(0.1, "Conectando aos remotes...")
 
 LapoHub:SetUser("LapoLapoNaldo", "Lapo Newba")
 LapoHub:SetUserCallback(function(n, r)
@@ -253,6 +262,7 @@ end
 
 LapoHub:AddLabel("📋 Quests", { text = "📋 Missões Secundárias" })
 
+LapoHub:SetLoadingProgress(0.35, "Carregando Quests...")
 local questList = {}
 local okQuest, questModule = pcall(function()
     return require(RS.Modules.Quests.QuestManager.QuestTypes.Side)
@@ -1071,6 +1081,7 @@ LapoHub:AddSeparator("🎲 Traits")
 
 LapoHub:AddLabel("👕 Skins", { text = "👕 Loja de Skins" })
 
+LapoHub:SetLoadingProgress(0.75, "Carregando Skins...")
 local SkinsData = {}
 local okSkin, ShopData = pcall(function() return require(RS.Modules.System.ShopData) end)
 if okSkin then
@@ -1429,15 +1440,18 @@ end
 
 LapoHub:AddSeparator("🔗 Webhook")
 
+LapoHub:SetLoadingProgress(0.95, "Finalizando...")
 updateTokenDisplay()
 if selectedUnit and selectedUnit ~= "Nenhuma unit encontrada" then
     refreshUnitDisplay(selectedUnit)
 end
 
-LapoHub:Notify({
-    title   = "⚡ Lapo Hub X",
-    content = "Hub carregado! " .. #UNITS .. " units\n8 tabs | Data version: " .. dataVersion,
-    duration = 5,
-})
+LapoHub:FinishLoading(function()
+    LapoHub:Notify({
+        title   = "⚡ Lapo Hub X",
+        content = "Hub carregado! " .. #UNITS .. " units\n8 tabs | Data version: " .. dataVersion,
+        duration = 5,
+    })
+end)
 
 return LapoHub
