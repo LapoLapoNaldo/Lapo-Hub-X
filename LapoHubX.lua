@@ -13,7 +13,7 @@ LapoHub:ShowLoading({
     Title    = "Lapo Hub X",
     Subtitle = "by LapoLapoNaldo",
     Message  = "Inicializando...",
-    Image  = "https://imgur.com/a/6TIqiJN",  
+    Image  = "https://i.imgur.com/NUNZ9zX.jpeg",  
 })
 
 LapoHub:AddTab("📊 Stats", "")
