@@ -44,6 +44,7 @@ local autoStarkei = false
 local autoUseGen = 0
 local autoStarkeiGen = 0
 local UnitDropdown, SkillDropdown, StarkeiTargetDropdown
+local selectedUnitLabel
 
 local function IsOwnedUnit(instance)
     local info = instance:FindFirstChild("Info")
@@ -220,6 +221,7 @@ UnitDropdown = LapoHub:AddDropdown("Auto Habilidades", {
     default = 1,
     callback = function(_, value)
         selectedUnit = value
+        if selectedUnitLabel then selectedUnitLabel:Set("Unit Selecionada: " .. tostring(value)) end
     end
 })
 
@@ -314,9 +316,12 @@ LapoHub:AddButton("Auto Habilidades", {
 })
 
 LapoHub:AddSeparator("Skills Rápidas")
-LapoHub:AddLabel("Skills Rápidas", { text = "⭐ Seleção Rápida de Melhores Buffs" })
+selectedUnitLabel = LapoHub:AddLabel("Skills Rápidas", { text = "Unit Selecionada: " .. (selectedUnit or "Nenhuma") })
 
-local BuffButtons = {"Road of Stars", "War Devil Uniform Sword", "Overdrive", "Kaioken", "Flight Armor", "Hakari Domain"}
+LapoHub:AddSeparator("Skills Rápidas")
+LapoHub:AddLabel("Skills Rápidas", { text = "⭐ Seleção Rápida de Skills Úteis" })
+
+local BuffButtons = {"Qemetiel", "Belial", "Rewind Punch"}
 for _, skill in ipairs(BuffButtons) do
     LapoHub:AddButton("Skills Rápidas", {
         text = "Usar " .. skill,
@@ -411,6 +416,7 @@ LapoHub:AddButton("Funções Starkei", {
             starkeiTarget = "Starkei"
             if UnitDropdown then UnitDropdown:Set("Starkei") end
             if StarkeiTargetDropdown then StarkeiTargetDropdown:Set("Starkei") end
+            if selectedUnitLabel then selectedUnitLabel:Set("Unit Selecionada: Starkei") end
         end
     end
 })
