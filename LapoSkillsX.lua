@@ -42,6 +42,10 @@ local cachedGraves
 -- NaN damage farm
 local nanUnits, selectedNanUnit, nanDropdown
 
+-- Equip Unit
+local equipUnits, selectedEquipUnit, equipUnitDropdown
+local selectedEquipSlot = 1
+
 -- ===================== Funções =====================
 local function IsOwnedUnit(instance)
     local info  = instance:FindFirstChild("Info")
@@ -292,6 +296,48 @@ local function GetDataUnits()
     return list
 end
 
+-- party atual em mapa { Equip1 = nome, ..., Equip6 = nome }
+local function GetPartyMap()
+    local map = {}
+    local party = LocalPlayer:FindFirstChild("Data") and LocalPlayer.Data:FindFirstChild("Party")
+    if party then
+        local attrs = party:GetAttributes()
+        for i = 1, 6 do map["Equip" .. i] = attrs["Equip" .. i] or "" end
+    end
+    return map
+end
+
+-- serializa a party no formato do packet: por slot -> \6 \v <len> nome \v <len> Equip#
+local function BuildPartyPacket(party)
+    local out = {}
+    for i = 1, 6 do
+        local slot = "Equip" .. i
+        local name = party[slot]
+        if name and name ~= "" then
+            out[#out + 1] = string.char(6) .. string.char(11) .. string.char(#name) .. name
+                .. string.char(11) .. string.char(#slot) .. slot
+        end
+    end
+    return table.concat(out)
+end
+
+-- troca uma unit num slot disparando o packet no client (firesignal + buffer)
+local function EquipUnit(unitName, slotNum)
+    local sys    = ReplicatedStorage:FindFirstChild("System")
+    local pkt    = sys and sys:FindFirstChild("Packet")
+    local remote = pkt and pkt:FindFirstChild("RemoteEvent")
+    if not remote then return false, "System.Packet.RemoteEvent não encontrado" end
+    if type(firesignal) ~= "function" then return false, "executor sem firesignal" end
+    if type(buffer) ~= "table" or type(buffer.fromstring) ~= "function" then return false, "executor sem buffer" end
+
+    local party = GetPartyMap()
+    party["Equip" .. slotNum] = unitName
+    local data = BuildPartyPacket(party)
+    local ok = pcall(function() firesignal(remote.OnClientEvent, buffer.fromstring(data)) end)
+    if not ok then return false, "falha ao disparar o packet" end
+    return true
+end
+
 -- valores iniciais que dependem das funções acima
 allUnits            = GetPlayerUnits()
 selectedUnit        = allUnits[1]
@@ -301,6 +347,8 @@ resenhaUnits        = GetEquippedUnits()
 selectedResenhaUnit = resenhaUnits[1]
 nanUnits            = GetDataUnits()
 selectedNanUnit     = nanUnits[1]
+equipUnits          = GetDataUnits()
+selectedEquipUnit   = equipUnits[1]
 
 -- ===================== Hub (UI) =====================
 LapoHub:ShowLoading({
@@ -313,6 +361,7 @@ LapoHub:ShowLoading({
 LapoHub:AddTab("Auto Habilidades", "")
 LapoHub:AddTab("Skills Rápidas", "")
 LapoHub:AddTab("Funções Starkei", "")
+LapoHub:AddTab("Equip Unit", "")
 LapoHub:AddTab("Sabor Inf Damage", "")
 LapoHub:AddTab("Evento Grave", "")
 
@@ -521,6 +570,52 @@ LapoHub:AddButton("Funções Starkei", {
         end
     end
 })
+
+-- Aba: Equip Unit (equipa qualquer unit do inventário em qualquer slot)
+LapoHub:SetLoadingProgress(0.65, "Carregando Equip Unit...")
+LapoHub:AddLabel("Equip Unit", { text = "🎒 Equipar Unit em qualquer slot" })
+
+equipUnitDropdown = LapoHub:AddDropdown("Equip Unit", {
+    text = "Unit do Inventário",
+    options = equipUnits,
+    default = 1,
+    callback = function(_, value) selectedEquipUnit = value end
+})
+
+LapoHub:AddButton("Equip Unit", {
+    text = "🔄 Atualizar Inventário",
+    callback = function()
+        equipUnits = GetDataUnits()
+        if equipUnitDropdown then equipUnitDropdown:Set(equipUnits) end
+        selectedEquipUnit = equipUnits[1]
+        LapoHub:Notify({ title = "Equip Unit", content = #equipUnits .. " unit(s) no inventário", duration = 2 })
+    end
+})
+
+LapoHub:AddDropdown("Equip Unit", {
+    text = "Slot (Equip 1-6)",
+    options = { "1", "2", "3", "4", "5", "6" },
+    default = 1,
+    callback = function(_, value) selectedEquipSlot = tonumber(value) or 1 end
+})
+
+LapoHub:AddButton("Equip Unit", {
+    text = "✅ Equipar no Slot",
+    callback = function()
+        if not selectedEquipUnit or selectedEquipUnit == "Nenhuma unit" then
+            LapoHub:Notify({ title = "Equip Unit", content = "Selecione uma unit válida primeiro!", duration = 3 })
+            return
+        end
+        local ok, err = EquipUnit(selectedEquipUnit, selectedEquipSlot)
+        if ok then
+            LapoHub:Notify({ title = "Equip Unit", content = selectedEquipUnit .. " → Equip" .. selectedEquipSlot, duration = 3 })
+        else
+            LapoHub:Notify({ title = "Erro", content = tostring(err or "falha ao equipar"), duration = 4 })
+        end
+    end
+})
+
+LapoHub:AddParagraph("Equip Unit", { text = "• Escolha a unit e o slot (1-6) e clique em Equipar." })
 
 -- Aba: Sabor Inf Damage (spawn em altura alta, requer unit com Ambush)
 LapoHub:SetLoadingProgress(0.7, "Carregando Sabor Inf Damage...")
