@@ -1,50 +1,76 @@
-local LapoHub
+local LapoX
+-- cleanup ao reexecutar
+if _G._LapoHubXInstance then pcall(function() _G._LapoHubXInstance:Destroy() end) end
+if _G._LapoHubXThreads then
+    for _, t in ipairs(_G._LapoHubXThreads) do pcall(task.cancel, t) end
+end
+
 local success, err = pcall(function()
     return loadstring(readfile("Library.lua"))()
 end)
 if success and err then
-    LapoHub = err
+    LapoX = err
 else
-    LapoHub = loadstring(game:HttpGet("https://raw.githubusercontent.com/LapoLapoNaldo/Lapo-X/refs/heads/main/Library.lua"))()
+    LapoX = loadstring(game:HttpGet("https://raw.githubusercontent.com/LapoLapoNaldo/Lapo-X/refs/heads/main/Library.lua"))()
 end
 
 
-LapoHub:ShowLoading({
+LapoX:ShowLoading({
     Title    = "Lapo Hub X",
     Subtitle = "by LapoLapoNaldo",
     Message  = "Inicializando...",
     Image  = "https://i.imgur.com/NUNZ9zX.jpeg",  
 })
 
-LapoHub:AddTab("📊 Stats", "")
-LapoHub:AddTab("📋 Quests", "")
-LapoHub:AddTab("⬆ Limit Break", "")
-LapoHub:AddTab("🎁 Banners", "")
-LapoHub:AddTab("🗺 Stages", "")
-LapoHub:AddTab("🎲 Traits", "")
-LapoHub:AddTab("👕 Skins", "")
-LapoHub:AddTab("🔗 Webhook", "")
+LapoX:AddTab("📊 Stats", "")
+LapoX:AddTab("📋 Quests", "")
+LapoX:AddTab("⬆ Limit Break", "")
+LapoX:AddTab("🎁 Banners", "")
+LapoX:AddTab("🗺 Stages", "")
+LapoX:AddTab("🎲 Traits", "")
+LapoX:AddTab("👕 Skins", "")
+LapoX:AddTab("🔗 Webhook", "")
 
-LapoHub:Init({
+LapoX:Init({
     Title     = "Lapo Hub X",
     ToggleKey = "K",
 })
-LapoHub:SetLoadingProgress(0.1, "Conectando aos remotes...")
+_G._LapoHubXInstance = LapoX
+_G._LapoHubXThreads = _activeThreads
+LapoX:SetLoadingProgress(0.1, "Conectando aos remotes...")
 
-LapoHub:SetUser("LapoLapoNaldo", "Lapo Newba")
-LapoHub:SetUserCallback(function(n, r)
-    LapoHub:Notify({ title = "User", content = n .. " • " .. r, duration = 3 })
+LapoX:SetUser("LapoLapoNaldo", "Lapo Newba")
+LapoX:SetUserCallback(function(n, r)
+    LapoX:Notify({ title = "User", content = n .. " • " .. r, duration = 3 })
 end)
 
 local Players  = game:GetService("Players")
 local RS       = game:GetService("ReplicatedStorage")
 local HttpSvc  = game:GetService("HttpService")
 local LP       = Players.LocalPlayer
-local UIS      = game:GetService("UserInputService")
 local Remote   = RS:WaitForChild("Remote")
+
+-- Cache de remotes para evitar WaitForChild repetido
+local R = {}
+for _, name in ipairs({"ReturnData","Gacha","LimitBreak","traitRemote","HolyGrail","BuySkin","BuyItem","GetSideQuest","CreateRoom","SpawnUnit"}) do
+    R[name] = Remote:FindFirstChild(name)
+end
+
+-- Helper para notificações de erro
+local function notifyErr(title, msg)
+    LapoX:Notify({ title = title, content = msg, duration = 4 })
+end
 
 local WEBHOOK_LOGS_ENABLED = false
 local SendWebhook = function() return false end
+
+-- Rastreamento de threads para cancelamento ao reexecutar
+local _activeThreads = {}
+local function trackSpawn(fn)
+    local t = task.spawn(fn)
+    _activeThreads[#_activeThreads + 1] = t
+    return t
+end
 
 local function SafeInvoke(remote, ...)
     local args = {...}
@@ -67,10 +93,9 @@ local dataVersion = 0
 
 local function GetReturnData()
     local remote = Remote:FindFirstChild("ReturnData")
-    if remote then
-        local ok, data = pcall(function() return SafeInvoke(remote) end)
-        if ok and type(data) == "table" then return data end
-    end
+    if not remote then return nil end
+    local ok, data = pcall(function() return remote:InvokeServer() end)
+    if ok and type(data) == "table" then return data end
     return nil
 end
 
@@ -115,7 +140,7 @@ local TRAIT_NAMES = {
 
 local BEST_TRAITS = { ["The Honored One"]=true, ["The Fallen One"]=true, ["Assassin"]=true, ["Divine Treasure"]=true }
 
-LapoHub:AddLabel("📊 Stats", { text = "📊 Visualizar Stats" })
+LapoX:AddLabel("📊 Stats", { text = "📊 Visualizar Stats" })
 
 local function convertStat(statName, value)
     local numValue = tonumber(value)
@@ -213,7 +238,7 @@ local function refreshStatsDisplay()
 end
 
 local _statsDropdown
-_statsDropdown = LapoHub:AddDropdown("📊 Stats", {
+_statsDropdown = LapoX:AddDropdown("📊 Stats", {
     text = "Selecione a Unit",
     options = statsUnitNames,
     default = 1,
@@ -223,13 +248,13 @@ _statsDropdown = LapoHub:AddDropdown("📊 Stats", {
     end,
 })
 
-LapoHub:AddButton("📊 Stats", {
+LapoX:AddButton("📊 Stats", {
     text = "🔄 Atualizar Dados",
     callback = function()
         local verBefore = dataVersion
         forceReadUnits()
         if dataVersion == verBefore then
-            LapoHub:Notify({ title="Stats", content="Falha ao atualizar", duration=3 })
+            LapoX:Notify({ title="Stats", content="Falha ao atualizar", duration=3 })
             return
         end
         local newData = { Units = cachedUnitsData }
@@ -245,24 +270,24 @@ LapoHub:AddButton("📊 Stats", {
             statsSelectedUnit = statsUnits[1]
             refreshStatsDisplay()
         end
-        LapoHub:Notify({ title="Stats", content="Dados atualizados!", duration=2 })
+        LapoX:Notify({ title="Stats", content="Dados atualizados!", duration=2 })
     end,
 })
 
-LapoHub:AddSeparator("📊 Stats")
-LapoHub:AddParagraph("📊 Stats", { text = "ATK/STA scale: 115 = 1.5x | COST scale: 85 = 1.5x" })
+LapoX:AddSeparator("📊 Stats")
+LapoX:AddParagraph("📊 Stats", { text = "ATK/STA scale: 115 = 1.5x | COST scale: 85 = 1.5x" })
 
 for i = 1, 15 do
-    statsInfoLabels[i] = LapoHub:AddLabel("📊 Stats", { text = "" })
+    statsInfoLabels[i] = LapoX:AddLabel("📊 Stats", { text = "" })
 end
 
 if statsSelectedUnit and statsData and statsData.Units and statsData.Units[statsSelectedUnit] then
     refreshStatsDisplay()
 end
 
-LapoHub:AddLabel("📋 Quests", { text = "📋 Missões Secundárias" })
+LapoX:AddLabel("📋 Quests", { text = "📋 Missões Secundárias" })
 
-LapoHub:SetLoadingProgress(0.35, "Carregando Quests...")
+LapoX:SetLoadingProgress(0.35, "Carregando Quests...")
 local questList = {}
 local okQuest, questModule = pcall(function()
     return require(RS.Modules.Quests.QuestManager.QuestTypes.Side)
@@ -284,14 +309,14 @@ local questOptions = {}
 for _, q in ipairs(questList) do questOptions[#questOptions+1] = q.Name end
 
 local selectedQuest = questList[1]
-local questItemLabel = LapoHub:AddLabel("📋 Quests", { text = "Nenhuma quest encontrada" })
-local questRewardLabel = LapoHub:AddLabel("📋 Quests", { text = "" })
+local questItemLabel = LapoX:AddLabel("📋 Quests", { text = "Nenhuma quest encontrada" })
+local questRewardLabel = LapoX:AddLabel("📋 Quests", { text = "" })
 
 if #questList > 0 then
     questItemLabel:updateText("Requisito: " .. (selectedQuest.Title or "-"))
     questRewardLabel:updateText("Recompensa: " .. (selectedQuest.Reward or "-"))
 
-    LapoHub:AddDropdown("📋 Quests", {
+    LapoX:AddDropdown("📋 Quests", {
         text = "Selecionar Quest",
         options = questOptions,
         default = 1,
@@ -307,12 +332,12 @@ if #questList > 0 then
         end,
     })
 
-    LapoHub:AddButton("📋 Quests", {
+    LapoX:AddButton("📋 Quests", {
         text = "▶ Iniciar Quest Selecionada",
         callback = function()
             if selectedQuest and selectedQuest.Name then
-                SafeFire(Remote:WaitForChild("GetSideQuest"), selectedQuest.Name)
-                LapoHub:Notify({ title="Quest", content="Iniciada: " .. selectedQuest.Name, duration=3 })
+                SafeFire((R.GetSideQuest or Remote:WaitForChild("GetSideQuest", 5)), selectedQuest.Name)
+                LapoX:Notify({ title="Quest", content="Iniciada: " .. selectedQuest.Name, duration=3 })
             end
         end,
     })
@@ -320,20 +345,22 @@ else
     questItemLabel:updateText("Nenhuma quest encontrada.")
 end
 
-LapoHub:AddSeparator("📋 Quests")
+LapoX:AddSeparator("📋 Quests")
 
-LapoHub:AddLabel("⬆ Limit Break", { text = "⬆ Limit Break" })
+LapoX:AddLabel("⬆ Limit Break", { text = "⬆ Limit Break" })
 
 local lbUnits = { "Vending Machine","Stone Doctor","Shining Star Idol","Investigator",
     "Denis","Ultimis","CapsuleGirl","Shielder","Peem","Leader","Gamble Queen","Ramen Guy" }
+local lbUnitsSet = {}
+for _, u in ipairs(lbUnits) do lbUnitsSet[u] = true end
 
 local lbSelectedUnit = lbUnits[1]
 local lbSelectedTimes = "1"
 local lbTimeOpts = {"1","2","3","4","5"}
 
-local lbSelectionLabel = LapoHub:AddLabel("⬆ Limit Break", { text = "Selecionado: " .. lbSelectedUnit .. " x" .. lbSelectedTimes })
-local lbInfoLabel = LapoHub:AddLabel("⬆ Limit Break", { text = "Info: -" })
-local lbPerfectLabel = LapoHub:AddLabel("⬆ Limit Break", { text = "Perfect: 0/0" })
+local lbSelectionLabel = LapoX:AddLabel("⬆ Limit Break", { text = "Selecionado: " .. lbSelectedUnit .. " x" .. lbSelectedTimes })
+local lbInfoLabel = LapoX:AddLabel("⬆ Limit Break", { text = "Info: -" })
+local lbPerfectLabel = LapoX:AddLabel("⬆ Limit Break", { text = "Perfect: 0/0" })
 
 local function updateLBInfo(unitName)
 
@@ -343,7 +370,7 @@ local function updateLBInfo(unitName)
     lbInfoLabel:updateText("LB: " .. tostring(lbVal))
 end
 
-LapoHub:AddDropdown("⬆ Limit Break", {
+LapoX:AddDropdown("⬆ Limit Break", {
     text = "Selecionar Unit",
     options = lbUnits,
     default = 1,
@@ -354,7 +381,7 @@ LapoHub:AddDropdown("⬆ Limit Break", {
     end,
 })
 
-LapoHub:AddDropdown("⬆ Limit Break", {
+LapoX:AddDropdown("⬆ Limit Break", {
     text = "Vezes",
     options = lbTimeOpts,
     default = 1,
@@ -364,36 +391,36 @@ LapoHub:AddDropdown("⬆ Limit Break", {
     end,
 })
 
-LapoHub:AddButton("⬆ Limit Break", {
+LapoX:AddButton("⬆ Limit Break", {
     text = "▶ Iniciar Limit Break",
     callback = function()
         local times = tonumber(lbSelectedTimes) or 1
-        task.spawn(function()
+        trackSpawn(function()
             for i = 1, times do
-                local ok = SafeInvoke(Remote:WaitForChild("LimitBreak"), lbSelectedUnit)
+                local ok = SafeInvoke((R.LimitBreak or Remote:WaitForChild("LimitBreak", 5)), lbSelectedUnit)
                 if not ok then
-                    LapoHub:Notify({ title="LB Error", content="Falha no Limit Break", duration=4 })
+                    LapoX:Notify({ title="LB Error", content="Falha no Limit Break", duration=4 })
                     break
                 end
                 task.wait(0.2)
             end
-            LapoHub:Notify({ title="LB", content="Finalizado! " .. tostring(times) .. "x em " .. lbSelectedUnit, duration=3 })
+            LapoX:Notify({ title="LB", content="Finalizado! " .. tostring(times) .. "x em " .. lbSelectedUnit, duration=3 })
         end)
     end,
 })
 
-LapoHub:AddButton("⬆ Limit Break", {
+LapoX:AddButton("⬆ Limit Break", {
     text = "🔍 Verificar Perfect Stats",
     callback = function()
         local data = GetReturnData()
         if not data then
-            LapoHub:Notify({ title="Error", content="Falha ao carregar dados", duration=4 })
+            LapoX:Notify({ title="Error", content="Falha ao carregar dados", duration=4 })
             return
         end
         local inv = data.Units or {}
         local perfectCount, totalCount = 0, 0
         for unitName, u in pairs(inv) do
-            if not table.find(lbUnits, unitName) then
+            if not lbUnitsSet[unitName] then
                 totalCount = totalCount + 1
                 local isPerfect = true
                 if math.abs(tonumber(u.Upgrade or 0) - 100) >= 1e-6 then isPerfect = false end
@@ -406,45 +433,45 @@ LapoHub:AddButton("⬆ Limit Break", {
             end
         end
         lbPerfectLabel:updateText("Perfect: " .. perfectCount .. "/" .. totalCount)
-        LapoHub:Notify({ title="Perfect Check", content=perfectCount .. "/" .. totalCount .. " perfect", duration=4 })
+        LapoX:Notify({ title="Perfect Check", content=perfectCount .. "/" .. totalCount .. " perfect", duration=4 })
     end,
 })
 
-LapoHub:AddButton("⬆ Limit Break", {
+LapoX:AddButton("⬆ Limit Break", {
     text = "🏆 Holy Grail em Todas Units",
     callback = function()
         local data = GetReturnData()
         if not data then
-            LapoHub:Notify({ title="Error", content="Falha ao carregar dados", duration=4 })
+            LapoX:Notify({ title="Error", content="Falha ao carregar dados", duration=4 })
             return
         end
         local inv = data.Units or {}
         local total = 0
         for unitName, _ in pairs(inv) do
-            if not table.find(lbUnits, unitName) then total = total + 1 end
+            if not lbUnitsSet[unitName] then total = total + 1 end
         end
-        LapoHub:Notify({ title="Holy Grail", content="Processando " .. total .. " units...", duration=3 })
+        LapoX:Notify({ title="Holy Grail", content="Processando " .. total .. " units...", duration=3 })
 
-        task.spawn(function()
+        trackSpawn(function()
             local processed = 0
             for unitName, _ in pairs(inv) do
-                if not table.find(lbUnits, unitName) then
+                if not lbUnitsSet[unitName] then
                     processed = processed + 1
-                    SafeInvoke(Remote:WaitForChild("HolyGrail"), unitName)
+                    SafeInvoke((R.HolyGrail or Remote:WaitForChild("HolyGrail", 5)), unitName)
                     if processed % 10 == 0 then
-                        LapoHub:Notify({ title="Holy Grail", content=processed .. "/" .. total .. " concluídas", duration=2 })
+                        LapoX:Notify({ title="Holy Grail", content=processed .. "/" .. total .. " concluídas", duration=2 })
                     end
                     task.wait(0.15)
                 end
             end
-            LapoHub:Notify({ title="✅ Holy Grail", content="Todas as " .. total .. " units processadas!", duration=4 })
+            LapoX:Notify({ title="✅ Holy Grail", content="Todas as " .. total .. " units processadas!", duration=4 })
         end)
     end,
 })
 
-LapoHub:AddSeparator("⬆ Limit Break")
+LapoX:AddSeparator("⬆ Limit Break")
 
-LapoHub:AddLabel("🎁 Banners", { text = "🎁 Banners" })
+LapoX:AddLabel("🎁 Banners", { text = "🎁 Banners" })
 
 local bannerList = {
     {Name="Beginning Adventurers", Type="Gacha", Triggers={[1]="Beginning Adventurers",[2]="Beginning Adventurers"}, Req="Puzzle"},
@@ -475,10 +502,10 @@ local eventBannerList = {
 }
 
 local function makeBannerUI(sectionName, banners)
-    LapoHub:AddLabel("🎁 Banners", { text = sectionName })
+    LapoX:AddLabel("🎁 Banners", { text = sectionName })
 
     if #banners == 0 then
-        LapoHub:AddParagraph("🎁 Banners", { text = "Nenhum banner disponível" })
+        LapoX:AddParagraph("🎁 Banners", { text = "Nenhum banner disponível" })
         return
     end
 
@@ -490,9 +517,9 @@ local function makeBannerUI(sectionName, banners)
     local autoRollOn = false
     local autoRollRunning = false
 
-    local reqLabel = LapoHub:AddLabel("🎁 Banners", { text = "Requisito: " .. (selBanner.Req or "-") })
+    local reqLabel = LapoX:AddLabel("🎁 Banners", { text = "Requisito: " .. (selBanner.Req or "-") })
 
-    LapoHub:AddDropdown("🎁 Banners", {
+    LapoX:AddDropdown("🎁 Banners", {
         text = "Selecionar Banner",
         options = bannernames,
         default = 1,
@@ -503,29 +530,29 @@ local function makeBannerUI(sectionName, banners)
         end,
     })
 
-    LapoHub:AddDropdown("🎁 Banners", {
+    LapoX:AddDropdown("🎁 Banners", {
         text = "Modo",
         options = { "1x", "10x" },
         default = 1,
         callback = function(_, value) spinMode = value end,
     })
 
-    LapoHub:AddButton("🎁 Banners", {
+    LapoX:AddButton("🎁 Banners", {
         text = "🎰 Rodar 1x",
         callback = function()
             local amount = (spinMode == "10x") and 2 or 1
             local ok
             if selBanner.Type == "Gacha" then
-                ok = SafeInvoke(Remote:WaitForChild("Gacha"), amount == 1 and 1 or 10, selBanner.Triggers[amount])
+                ok = SafeInvoke((R.Gacha or Remote:WaitForChild("Gacha", 5)), amount == 1 and 1 or 10, selBanner.Triggers[amount])
             elseif selBanner.Type == "BuyItem" then
-                ok = SafeInvoke(Remote:WaitForChild("BuyItem"), selBanner.Triggers[amount], selBanner.Vendor)
+                ok = SafeInvoke((R.BuyItem or Remote:WaitForChild("BuyItem", 5)), selBanner.Triggers[amount], selBanner.Vendor)
             end
-            if not ok then LapoHub:Notify({ title="Banner", content="Falha ao rodar", duration=4 })
-            else LapoHub:Notify({ title="Banner", content="Rodado com sucesso!", duration=3 }) end
+            if not ok then LapoX:Notify({ title="Banner", content="Falha ao rodar", duration=4 })
+            else LapoX:Notify({ title="Banner", content="Rodado com sucesso!", duration=3 }) end
         end,
     })
 
-    LapoHub:AddToggle("🎁 Banners", {
+    LapoX:AddToggle("🎁 Banners", {
         text = "🔄 Auto-Roll",
         default = false,
         callback = function(state)
@@ -533,13 +560,13 @@ local function makeBannerUI(sectionName, banners)
             if not state then return end
             if autoRollRunning then return end
             autoRollRunning = true
-            task.spawn(function()
+            trackSpawn(function()
                 while autoRollOn do
                     local amount = (spinMode == "10x") and 2 or 1
                     if selBanner.Type == "Gacha" then
-                        SafeInvoke(Remote:WaitForChild("Gacha"), amount == 1 and 1 or 10, selBanner.Triggers[amount])
+                        SafeInvoke((R.Gacha or Remote:WaitForChild("Gacha", 5)), amount == 1 and 1 or 10, selBanner.Triggers[amount])
                     elseif selBanner.Type == "BuyItem" then
-                        SafeInvoke(Remote:WaitForChild("BuyItem"), selBanner.Triggers[amount], selBanner.Vendor)
+                        SafeInvoke((R.BuyItem or Remote:WaitForChild("BuyItem", 5)), selBanner.Triggers[amount], selBanner.Vendor)
                     end
                     task.wait(2)
                 end
@@ -550,11 +577,11 @@ local function makeBannerUI(sectionName, banners)
 end
 
 makeBannerUI("— Banners Padrão", bannerList)
-LapoHub:AddSeparator("🎁 Banners")
+LapoX:AddSeparator("🎁 Banners")
 makeBannerUI("— Banners de Evento", eventBannerList)
-LapoHub:AddSeparator("🎁 Banners")
+LapoX:AddSeparator("🎁 Banners")
 
-LapoHub:AddLabel("🗺 Stages", { text = "🗺 Estágios & Abyss" })
+LapoX:AddLabel("🗺 Stages", { text = "🗺 Estágios & Abyss" })
 
 local stages = {
     "The Fascinating Horizon","The Fascinating Horizon EX",
@@ -592,10 +619,10 @@ local selDifficulty = difficulties[1]
 local selMethod    = methods[1]
 local filterText   = ""
 
-local stageCountLabel = LapoHub:AddLabel("🗺 Stages", { text = "Estágios: " .. #stages })
+local stageCountLabel = LapoX:AddLabel("🗺 Stages", { text = "Estágios: " .. #stages })
 
 local _stageDd
-_stageDd = LapoHub:AddDropdown("🗺 Stages", {
+_stageDd = LapoX:AddDropdown("🗺 Stages", {
     text = "Selecionar Estágio",
     options = filteredStages,
     default = 1,
@@ -616,7 +643,7 @@ local function ApplyFilter()
     stageCountLabel:updateText("Estágios: " .. #filteredStages .. "/" .. #stages)
 end
 
-LapoHub:AddTextBox("🗺 Stages", {
+LapoX:AddTextBox("🗺 Stages", {
     text = "Filtrar por nome",
     placeholder = "ex: Shadow...",
     callback = function(value)
@@ -625,30 +652,30 @@ LapoHub:AddTextBox("🗺 Stages", {
     end,
 })
 
-LapoHub:AddDropdown("🗺 Stages", {
+LapoX:AddDropdown("🗺 Stages", {
     text = "Dificuldade",
     options = difficulties,
     default = 1,
     callback = function(_, value) selDifficulty = value end,
 })
 
-LapoHub:AddDropdown("🗺 Stages", {
+LapoX:AddDropdown("🗺 Stages", {
     text = "Método",
     options = methods,
     default = 1,
     callback = function(_, value) selMethod = value end,
 })
 
-LapoHub:AddButton("🗺 Stages", {
+LapoX:AddButton("🗺 Stages", {
     text = "▶ Ir para Estágio",
     callback = function()
         if selStage == "Sem resultado" then
-            LapoHub:Notify({ title="Stage", content="Stage inválido", duration=3 })
+            LapoX:Notify({ title="Stage", content="Stage inválido", duration=3 })
             return
         end
         local ok
         if selMethod == methods[1] then
-            ok = SafeFire(Remote:WaitForChild("CreateRoom"), {
+            ok = SafeFire((R.CreateRoom or Remote:WaitForChild("CreateRoom", 5)), {
                 ["StageSelect"] = selStage,
                 ["Image"] = "rbxassetid://9617217504",
                 ["FriendOnly"] = false,
@@ -657,17 +684,17 @@ LapoHub:AddButton("🗺 Stages", {
         else
             ok = SafeFire(Remote.TeleportToStage, selStage)
         end
-        if not ok then LapoHub:Notify({ title="Stage Error", content="Falha ao teleportar", duration=4 })
-        else LapoHub:Notify({ title="Stage", content="Teleportando para " .. selStage .. "...", duration=3 }) end
+        if not ok then LapoX:Notify({ title="Stage Error", content="Falha ao teleportar", duration=4 })
+        else LapoX:Notify({ title="Stage", content="Teleportando para " .. selStage .. "...", duration=3 }) end
     end,
 })
 
-LapoHub:AddSeparator("🗺 Stages")
-LapoHub:AddLabel("🗺 Stages", { text = "🌀 Abyss" })
+LapoX:AddSeparator("🗺 Stages")
+LapoX:AddLabel("🗺 Stages", { text = "🌀 Abyss" })
 
 local abyssNumber = 1
 
-LapoHub:AddTextBox("🗺 Stages", {
+LapoX:AddTextBox("🗺 Stages", {
     text = "Número do Abyss (1-100000)",
     placeholder = "1",
     callback = function(value)
@@ -678,20 +705,20 @@ LapoHub:AddTextBox("🗺 Stages", {
     end,
 })
 
-LapoHub:AddButton("🗺 Stages", {
+LapoX:AddButton("🗺 Stages", {
     text = "🌀 Ir para Abyss",
     callback = function()
         local ok = SafeFire(Remote.TeleportToStage, "Abyss_" .. tostring(abyssNumber))
-        if not ok then LapoHub:Notify({ title="Abyss Error", content="Falha ao ir para Abyss", duration=4 }) end
+        if not ok then LapoX:Notify({ title="Abyss Error", content="Falha ao ir para Abyss", duration=4 }) end
     end,
 })
 
-LapoHub:AddSeparator("🗺 Stages")
-LapoHub:AddLabel("🗺 Stages", { text = "⭐ StarPath" })
+LapoX:AddSeparator("🗺 Stages")
+LapoX:AddLabel("🗺 Stages", { text = "⭐ StarPath" })
 
 local starPathNode = 1
 
-LapoHub:AddDropdown("🗺 Stages", {
+LapoX:AddDropdown("🗺 Stages", {
     text = "Node",
     options = {"1", "2", "3"},
     default = 1,
@@ -700,17 +727,17 @@ LapoHub:AddDropdown("🗺 Stages", {
     end,
 })
 
-LapoHub:AddButton("🗺 Stages", {
+LapoX:AddButton("🗺 Stages", {
     text = "⭐ Ir para Node",
     callback = function()
         local ok = SafeFire(Remote.StarPath, "Attempt", {["Node"] = starPathNode})
-        if not ok then LapoHub:Notify({ title="StarPath Error", content="Falha ao ir para StarPath", duration=4 }) end
+        if not ok then LapoX:Notify({ title="StarPath Error", content="Falha ao ir para StarPath", duration=4 }) end
     end,
 })
 
-LapoHub:AddSeparator("🗺 Stages")
+LapoX:AddSeparator("🗺 Stages")
 
-LapoHub:AddLabel("🎲 Traits", { text = "🎲 Rolador de Traits" })
+LapoX:AddLabel("🎲 Traits", { text = "🎲 Rolador de Traits" })
 
 local RR_TYPES = { "Random", "SuperRandom" }
 local selectedRRType = RR_TYPES[1]
@@ -723,6 +750,7 @@ local selectedUnit = (function()
 end)()
 local selectedTrait = TRAIT_NAMES[1]
 local autoRolling = false
+local autoRollingAll = false
 local rollDelay = 0.8
 local rollCount = 0
 
@@ -760,26 +788,23 @@ local function waitForDataChange(timeoutSec)
     local versionBefore = dataVersion
     local elapsed = 0
     while elapsed < timeoutSec do
-        task.wait(0.05)
-        elapsed = elapsed + 0.05
-        if dataVersion > versionBefore then return true end
+        task.wait(0.3)
+        elapsed = elapsed + 0.3
         forceReadUnits()
         if dataVersion > versionBefore then return true end
     end
-    forceReadUnits()
     return false
 end
 
 local function doRoll(rrType, unitName)
-    local result = SafeInvoke(Remote:WaitForChild("traitRemote"), rrType, unitName)
+    local result = SafeInvoke((R.traitRemote or Remote:WaitForChild("traitRemote", 5)), rrType, unitName)
     if result == nil then return false, nil end
     return true, result
 end
 
 local UNITS = buildUnitList()
-local _traitUnitDropdown
 
-local refreshTokenLabel = LapoHub:AddLabel("🎲 Traits", { text = "Spirit: -- | Secret: -- | Celestial: -- | Super: --" })
+local refreshTokenLabel = LapoX:AddLabel("🎲 Traits", { text = "Spirit: -- | Secret: -- | Celestial: -- | Super: --" })
 
 local function updateTokenDisplay()
 
@@ -791,11 +816,11 @@ local function updateTokenDisplay()
         tostring(i["Celestial Crystal"] or 0), tostring(i["Super Celestial Crystal"] or 0)))
 end
 
-local unitInfoLabel   = LapoHub:AddLabel("🎲 Traits", { text = "Selecione uma unit..." })
-local traitAtualLabel = LapoHub:AddLabel("🎲 Traits", { text = "🎯 Trait Atual: —" })
-local traitSlotsLabel = LapoHub:AddLabel("🎲 Traits", { text = "📋 Slots: — | — | —" })
-local autoStatusLabel = LapoHub:AddLabel("🎲 Traits", { text = "⏹ Auto-Roll: Parado" })
-local debugLabel      = LapoHub:AddLabel("🎲 Traits", { text = "🔧 Debug: —" })
+local unitInfoLabel   = LapoX:AddLabel("🎲 Traits", { text = "Selecione uma unit..." })
+local traitAtualLabel = LapoX:AddLabel("🎲 Traits", { text = "🎯 Trait Atual: —" })
+local traitSlotsLabel = LapoX:AddLabel("🎲 Traits", { text = "📋 Slots: — | — | —" })
+local autoStatusLabel = LapoX:AddLabel("🎲 Traits", { text = "⏹ Auto-Roll: Parado" })
+local debugLabel      = LapoX:AddLabel("🎲 Traits", { text = "🔧 Debug: —" })
 
 local function refreshUnitDisplay(unitName)
     local info = getUnitInfo(unitName)
@@ -825,7 +850,7 @@ local function refreshUnitDisplay(unitName)
 end
 
 local _traitUnitDropdown
-_traitUnitDropdown = LapoHub:AddDropdown("🎲 Traits", {
+_traitUnitDropdown = LapoX:AddDropdown("🎲 Traits", {
     text = "Boneco",
     options = UNITS,
     default = 1,
@@ -835,56 +860,56 @@ _traitUnitDropdown = LapoHub:AddDropdown("🎲 Traits", {
     end,
 })
 
-LapoHub:AddButton("🎲 Traits", {
+LapoX:AddButton("🎲 Traits", {
     text = "🔄 Recarregar Units",
     callback = function()
         forceReadUnits()
         UNITS = buildUnitList()
         _traitUnitDropdown:Set(UNITS)
-        LapoHub:Notify({ title="Units", content="Encontradas: " .. #UNITS .. " units", duration=3 })
+        LapoX:Notify({ title="Units", content="Encontradas: " .. #UNITS .. " units", duration=3 })
     end,
 })
 
-LapoHub:AddButton("🎲 Traits", {
+LapoX:AddButton("🎲 Traits", {
     text = "💎 Atualizar Tokens",
-    callback = function() updateTokenDisplay(); LapoHub:Notify({ title="Tokens", content="Atualizado!", duration=2 }) end,
+    callback = function() updateTokenDisplay(); LapoX:Notify({ title="Tokens", content="Atualizado!", duration=2 }) end,
 })
 
-LapoHub:AddSeparator("🎲 Traits")
+LapoX:AddSeparator("🎲 Traits")
 
-LapoHub:AddDropdown("🎲 Traits", {
+LapoX:AddDropdown("🎲 Traits", {
     text = "Tipo de Roll",
     options = { "Normal (Random)", "Super (SuperRandom)" },
     default = 1,
     callback = function(_, value)
         selectedRRType = (value == "Super (SuperRandom)") and RR_TYPES[2] or RR_TYPES[1]
-        LapoHub:Notify({ title="Roll", content="Usando: " .. selectedRRType, duration=2 })
+        LapoX:Notify({ title="Roll", content="Usando: " .. selectedRRType, duration=2 })
     end,
 })
 
-LapoHub:AddDropdown("🎲 Traits", {
+LapoX:AddDropdown("🎲 Traits", {
     text = "Trait Desejada",
     options = TRAIT_NAMES,
     default = 1,
     callback = function(_, value)
         selectedTrait = value
         local d = TraitData[value]
-        if d then LapoHub:Notify({ title="🎯 [" .. d.Rarity .. "] " .. value, content=d.Desc, duration=4 }) end
+        if d then LapoX:Notify({ title="🎯 [" .. d.Rarity .. "] " .. value, content=d.Desc, duration=4 }) end
     end,
 })
 
-LapoHub:AddSlider("🎲 Traits", {
+LapoX:AddSlider("🎲 Traits", {
     text = "Delay entre rolls (seg)",
     min = 0.4, max = 3.0, default = 0.8,
     callback = function(value) rollDelay = value end,
 })
 
-LapoHub:AddSeparator("🎲 Traits")
+LapoX:AddSeparator("🎲 Traits")
 
-LapoHub:AddButton("🎲 Traits", {
+LapoX:AddButton("🎲 Traits", {
     text = "🎰 Girar 1x",
     callback = function()
-        if not selectedUnit or selectedUnit == "Nenhuma unit encontrada" then LapoHub:Notify({ title="Reroll", content="Selecione um boneco!", duration=3 }); return end
+        if not selectedUnit or selectedUnit == "Nenhuma unit encontrada" then LapoX:Notify({ title="Reroll", content="Selecione um boneco!", duration=3 }); return end
         local traitAntes = getUnitTrait(selectedUnit)
         debugLabel:updateText("🔧 Rolando... trait antes: " .. tostring(traitAntes))
         local ok, result = doRoll(selectedRRType, selectedUnit)
@@ -896,31 +921,33 @@ LapoHub:AddButton("🎲 Traits", {
         refreshUnitDisplay(selectedUnit)
         if traitAntes ~= traitDepois then
             local info = TraitData[traitDepois]
-            LapoHub:Notify({ title="🔄 Mudou!", content=traitAntes .. " → " .. traitDepois .. (info and ("["..info.Rarity.."]") or ""), duration=4 })
+            LapoX:Notify({ title="🔄 Mudou!", content=traitAntes .. " → " .. traitDepois .. (info and ("["..info.Rarity.."]") or ""), duration=4 })
         else
-            LapoHub:Notify({ title="🎰 Roll #" .. rollCount, content="Continua: " .. tostring(traitDepois), duration=2 })
+            LapoX:Notify({ title="🎰 Roll #" .. rollCount, content="Continua: " .. tostring(traitDepois), duration=2 })
         end
     end,
 })
 
-LapoHub:AddToggle("🎲 Traits", {
+LapoX:AddToggle("🎲 Traits", {
     text = "🔁 Auto-Roll até pegar trait",
     default = false,
     callback = function(state)
         autoRolling = state
         if not state then autoStatusLabel:updateText("⏹ Auto-Roll: Parado"); return end
+        if autoRollingAll then
+            LapoX:Notify({ title="Conflito", content="Pare o Auto Best primeiro!", duration=3 }); autoRolling = false; return end
         if not selectedUnit or selectedUnit == "Nenhuma unit encontrada" then
-            LapoHub:Notify({ title="Auto", content="Selecione um boneco!", duration=3 }); autoRolling = false; return end
+            LapoX:Notify({ title="Auto", content="Selecione um boneco!", duration=3 }); autoRolling = false; return end
         if not selectedTrait then
-            LapoHub:Notify({ title="Auto", content="Selecione a trait desejada!", duration=3 }); autoRolling = false; return end
+            LapoX:Notify({ title="Auto", content="Selecione a trait desejada!", duration=3 }); autoRolling = false; return end
 
         forceReadUnits()
         if getUnitTrait(selectedUnit) == selectedTrait then
-            LapoHub:Notify({ title="✅ Já tem!", content=selectedUnit .. " já possui " .. selectedTrait, duration=5 })
+            LapoX:Notify({ title="✅ Já tem!", content=selectedUnit .. " já possui " .. selectedTrait, duration=5 })
             autoRolling = false; autoStatusLabel:updateText("✅ Já possui: " .. selectedTrait); return
         end
 
-        task.spawn(function()
+        trackSpawn(function()
             local tries = 0; local startTick = tick()
             autoStatusLabel:updateText("🔄 Rolando... Buscando: " .. selectedTrait)
             while autoRolling do
@@ -940,7 +967,7 @@ LapoHub:AddToggle("🎲 Traits", {
                     autoRolling = false
                     local elapsed = tick() - startTick
                     autoStatusLabel:updateText(string.format("✅ ACHEI! %s em %d rolls (%.1fs)", selectedTrait, tries, elapsed))
-                    LapoHub:Notify({ title="🎉 TRAIT ENCONTRADA!", content=string.format("%s agora tem: %s\nRolls: %d | Tempo: %.1fs", selectedUnit, selectedTrait, tries, elapsed), duration=10 })
+                    LapoX:Notify({ title="🎉 TRAIT ENCONTRADA!", content=string.format("%s agora tem: %s\nRolls: %d | Tempo: %.1fs", selectedUnit, selectedTrait, tries, elapsed), duration=10 })
                     refreshUnitDisplay(selectedUnit); break
                 end
 
@@ -948,16 +975,16 @@ LapoHub:AddToggle("🎲 Traits", {
                 autoStatusLabel:updateText(string.format("🔄 Roll #%d | Atual: %s | Buscando: %s | %.0fs", tries, currentTrait, selectedTrait, elapsed))
                 if tries % 5 == 0 then refreshUnitDisplay(selectedUnit) end
                 if tries % 25 == 0 then
-                    LapoHub:Notify({ title="📊 Progresso", content=string.format("Rolls: %d | Última: %s\nBuscando: %s | Tempo: %.0fs", tries, currentTrait, selectedTrait, elapsed), duration=4 })
+                    LapoX:Notify({ title="📊 Progresso", content=string.format("Rolls: %d | Última: %s\nBuscando: %s | Tempo: %.0fs", tries, currentTrait, selectedTrait, elapsed), duration=4 })
                 end
                 if tries >= 500 then
                     autoRolling = false
                     autoStatusLabel:updateText("⚠ Parou em 500 rolls")
-                    LapoHub:Notify({ title="⚠ Limite", content="500 rolls sem encontrar. Parando.", duration=8 })
+                    LapoX:Notify({ title="⚠ Limite", content="500 rolls sem encontrar. Parando.", duration=8 })
                     refreshUnitDisplay(selectedUnit); break
                 end
                 if not dataChanged and tries > 3 and tries % 5 == 0 then
-                    LapoHub:Notify({ title="⚠ Aviso", content="Data não atualiza. Pode ser lag.", duration=3 })
+                    LapoX:Notify({ title="⚠ Aviso", content="Data não atualiza. Pode ser lag.", duration=3 })
                     task.wait(0.5); forceReadUnits()
                 end
             end
@@ -966,16 +993,16 @@ LapoHub:AddToggle("🎲 Traits", {
     end,
 })
 
-LapoHub:AddButton("🎲 Traits", {
+LapoX:AddButton("🎲 Traits", {
     text = "⏹ Parar Auto-Roll",
     callback = function()
-        if autoRolling then autoRolling = false; autoStatusLabel:updateText("⏹ Parado manualmente"); LapoHub:Notify({ title="Auto-Roll", content="Parado!", duration=2 }) end
+        if autoRolling then autoRolling = false; autoStatusLabel:updateText("⏹ Parado manualmente"); LapoX:Notify({ title="Auto-Roll", content="Parado!", duration=2 }) end
     end,
 })
 
-LapoHub:AddSeparator("🎲 Traits")
+LapoX:AddSeparator("🎲 Traits")
 
-LapoHub:AddButton("🎲 Traits", {
+LapoX:AddButton("🎲 Traits", {
     text = "📋 Listar Units com Traits",
     callback = function()
         forceReadUnits(); local units = cachedUnitsData
@@ -994,11 +1021,11 @@ LapoHub:AddButton("🎲 Traits", {
         table.sort(withTraits)
         local txt = "Total: " .. total .. "\nCom trait: " .. #withTraits
         if #withTraits > 0 then txt = txt .. "\n\n" .. table.concat(withTraits, "\n") end
-        LapoHub:Notify({ title="📋 Units com Traits", content=txt, duration=12 })
+        LapoX:Notify({ title="📋 Units com Traits", content=txt, duration=12 })
     end,
 })
 
-LapoHub:AddButton("🎲 Traits", {
+LapoX:AddButton("🎲 Traits", {
     text = "🔍 Units SEM Trait",
     callback = function()
         forceReadUnits(); local units = cachedUnitsData
@@ -1009,35 +1036,41 @@ LapoHub:AddButton("🎲 Traits", {
             if not has then table.insert(noTrait, name) end
         end
         table.sort(noTrait)
-        LapoHub:Notify({ title="🔍 Sem Trait (" .. #noTrait .. ")", content=#noTrait > 0 and table.concat(noTrait, "\n") or "Todas já têm trait!", duration=10 })
+        LapoX:Notify({ title="🔍 Sem Trait (" .. #noTrait .. ")", content=#noTrait > 0 and table.concat(noTrait, "\n") or "Todas já têm trait!", duration=10 })
     end,
 })
 
-LapoHub:AddButton("🎲 Traits", {
+LapoX:AddButton("🎲 Traits", {
     text = "📊 Stats da Sessão",
-    callback = function() LapoHub:Notify({ title="📊 Sessão", content="Total de rolls: " .. rollCount .. "\nData version: " .. dataVersion, duration=4 }) end,
+    callback = function() LapoX:Notify({ title="📊 Sessão", content="Total de rolls: " .. rollCount .. "\nData version: " .. dataVersion, duration=4 }) end,
 })
 
 local ignoreLBUnits = {"Vending Machine","Stone Doctor","Shining Star Idol","Investigator","Denis","Ultimis","CapsuleGirl","Shielder","Peem","Leader","Gamble Queen"}
+local ignoreLBSet = {}
+for _, u in ipairs(ignoreLBUnits) do ignoreLBSet[u] = true end
 
-LapoHub:AddToggle("🎲 Traits", {
+LapoX:AddToggle("🎲 Traits", {
     text = "🏆 Auto Melhor Trait em Todas",
     default = false,
     callback = function(state)
-        autoRolling = state
+        autoRollingAll = state
         if not state then return end
+        if autoRolling then
+            LapoX:Notify({ title="Conflito", content="Pare o Auto-Roll individual primeiro!", duration=3 })
+            autoRollingAll = false; return
+        end
         forceReadUnits()
-        LapoHub:Notify({ title="Auto Best", content="Iniciando...", duration=3 })
-        task.spawn(function()
+        LapoX:Notify({ title="Auto Best", content="Iniciando...", duration=3 })
+        trackSpawn(function()
             local allUnits = cachedUnitsData
             local unitList = {}
             for uname,_ in pairs(allUnits) do
-                if not table.find(ignoreLBUnits, uname) then table.insert(unitList, uname) end
+                if not ignoreLBSet[uname] then table.insert(unitList, uname) end
             end
             table.sort(unitList)
             local skipped, processed = 0, 0
             for _, unitName in ipairs(unitList) do
-                if not autoRolling then break end
+                if not autoRollingAll then break end
                 forceReadUnits()
                 local u = cachedUnitsData[unitName]
                 local hasTarget = false
@@ -1052,36 +1085,36 @@ LapoHub:AddToggle("🎲 Traits", {
                     local maxAttempts = 5000
                     local found = false
                     for attempt = 1, maxAttempts do
-                        if not autoRolling then break end
-                        local result = SafeInvoke(Remote:WaitForChild("traitRemote"), selectedRRType, unitName)
+                        if not autoRollingAll then break end
+                        local result = SafeInvoke((R.traitRemote or Remote:WaitForChild("traitRemote", 5)), selectedRRType, unitName)
                         if result then
                             local rolled = type(result) == "table" and result[1] or result
                             if type(rolled) == "string" and BEST_TRAITS[rolled] then
                                 found = true
-                                LapoHub:Notify({ title="✅ Trait!", content=unitName .. " → " .. rolled, duration=3 })
+                                LapoX:Notify({ title="✅ Trait!", content=unitName .. " → " .. rolled, duration=3 })
                                 if WEBHOOK_LOGS_ENABLED then
                                     SendWebhook({ embeds={{title="Auto Melhor Trait em Todas", description="Trait desejada obtida", color=0x58D68D, fields={{name="Unidade", value=unitName, inline=true},{name="Trait", value=rolled, inline=true}} }} })
                                 end
                                 break
                             end
                         end
-                        if attempt % 100 == 0 then task.wait() end
+                        if attempt % 5 == 0 then task.wait(0.1) end
                     end
-                    if not found then LapoHub:Notify({ title="⚠ Não achou", content=unitName .. " sem trait target após tentativas", duration=3 }) end
+                    if not found then LapoX:Notify({ title="⚠ Não achou", content=unitName .. " sem trait target após tentativas", duration=3 }) end
                 end
                 task.wait(0.3)
             end
-            autoRolling = false
-            LapoHub:Notify({ title="✅ Auto Best", content="Finalizado! Processados: " .. processed .. " | Pulados: " .. skipped, duration=5 })
+            autoRollingAll = false
+            LapoX:Notify({ title="✅ Auto Best", content="Finalizado! Processados: " .. processed .. " | Pulados: " .. skipped, duration=5 })
         end)
     end,
 })
 
-LapoHub:AddSeparator("🎲 Traits")
+LapoX:AddSeparator("🎲 Traits")
 
-LapoHub:AddLabel("👕 Skins", { text = "👕 Loja de Skins" })
+LapoX:AddLabel("👕 Skins", { text = "👕 Loja de Skins" })
 
-LapoHub:SetLoadingProgress(0.75, "Carregando Skins...")
+LapoX:SetLoadingProgress(0.75, "Carregando Skins...")
 local SkinsData = {}
 local okSkin, ShopData = pcall(function() return require(RS.Modules.System.ShopData) end)
 if okSkin then
@@ -1105,14 +1138,14 @@ for name in pairs(SkinsData) do table.insert(SkinNames, name) end
 table.sort(SkinNames)
 
 if #SkinNames == 0 then
-    LapoHub:AddParagraph("👕 Skins", { text = "Nenhuma skin encontrada" })
+    LapoX:AddParagraph("👕 Skins", { text = "Nenhuma skin encontrada" })
 else
-    local skinCostLabel = LapoHub:AddLabel("👕 Skins", { text = "Custo: -" })
-    local skinRarityLabel = LapoHub:AddLabel("👕 Skins", { text = "Raridade: -" })
-    local skinMaterialLabel = LapoHub:AddLabel("👕 Skins", { text = "Material: -" })
+    local skinCostLabel = LapoX:AddLabel("👕 Skins", { text = "Custo: -" })
+    local skinRarityLabel = LapoX:AddLabel("👕 Skins", { text = "Raridade: -" })
+    local skinMaterialLabel = LapoX:AddLabel("👕 Skins", { text = "Material: -" })
     local selectedSkin = nil
 
-    LapoHub:AddDropdown("👕 Skins", {
+    LapoX:AddDropdown("👕 Skins", {
         text = "Selecionar Skin",
         options = SkinNames,
         default = 1,
@@ -1127,25 +1160,24 @@ else
         end,
     })
 
-    LapoHub:AddButton("👕 Skins", {
+    LapoX:AddButton("👕 Skins", {
         text = "🛒 Comprar Skin",
         callback = function()
-            if not selectedSkin then LapoHub:Notify({ title="Skins", content="Selecione uma skin primeiro!", duration=3 }); return end
-            local ok = SafeInvoke(Remote:WaitForChild("BuySkin"), selectedSkin)
-            if ok then LapoHub:Notify({ title="✅ Skin", content="Comprada: " .. selectedSkin, duration=4 })
-            else LapoHub:Notify({ title="❌ Skin", content="Falha ao comprar", duration=4 }) end
+            if not selectedSkin then LapoX:Notify({ title="Skins", content="Selecione uma skin primeiro!", duration=3 }); return end
+            local ok = SafeInvoke((R.BuySkin or Remote:WaitForChild("BuySkin", 5)), selectedSkin)
+            if ok then LapoX:Notify({ title="✅ Skin", content="Comprada: " .. selectedSkin, duration=4 })
+            else LapoX:Notify({ title="❌ Skin", content="Falha ao comprar", duration=4 }) end
         end,
     })
 end
 
-LapoHub:AddSeparator("👕 Skins")
+LapoX:AddSeparator("👕 Skins")
 
-LapoHub:AddLabel("🔗 Webhook", { text = "🔗 Webhook Settings" })
+LapoX:AddLabel("🔗 Webhook", { text = "🔗 Webhook Settings" })
 
 local webhookURL = ""
-local webhookEnabled = false
 
-LapoHub:AddTextBox("🔗 Webhook", {
+LapoX:AddTextBox("🔗 Webhook", {
     text = "Webhook URL",
     placeholder = "https://discord.com/api/webhooks/...",
     callback = function(value) webhookURL = value end,
@@ -1153,14 +1185,14 @@ LapoHub:AddTextBox("🔗 Webhook", {
 
 SendWebhook = function(content)
     if webhookURL == "" then
-        LapoHub:Notify({ title="Webhook", content="Defina a URL primeiro!", duration=3 })
+        LapoX:Notify({ title="Webhook", content="Defina a URL primeiro!", duration=3 })
         return false
     end
     local username = ""
     local userId = nil
     pcall(function() username = LP.Name or ""; userId = LP.UserId end)
 
-    local payload = { username = "Lapo Hub", avatar_url = "https://tr.rbxcdn.com/e2b8fdb35a39caa95f2aa1c48a2f7cd2/150/150/Image/Png" }
+    local payload = { username = "Lapo Hub X", avatar_url = "https://tr.rbxcdn.com/e2b8fdb35a39caa95f2aa1c48a2f7cd2/150/150/Image/Png" }
     if type(content) == "table" then
         payload.embeds = {}
         local headshot = userId and "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(userId) .. "&width=48&height=48&format=png" or nil
@@ -1179,24 +1211,24 @@ SendWebhook = function(content)
         local req = syn and syn.request or http_request or request or function(t) return HttpSvc:RequestAsync(t) end
         return req({ Url=webhookURL, Method="POST", Headers={["Content-Type"]="application/json"}, Body=jsonBody })
     end)
-    if not success then LapoHub:Notify({ title="Webhook Error", content=tostring(response), duration=5 }); return false end
+    if not success then LapoX:Notify({ title="Webhook Error", content=tostring(response), duration=5 }); return false end
     if response and (response.StatusCode == 204 or response.StatusCode == 200) then return true end
     return false
 end
 
-LapoHub:AddButton("🔗 Webhook", {
+LapoX:AddButton("🔗 Webhook", {
     text = "📤 Testar Webhook",
     callback = function()
         local ok = SendWebhook("Teste do Lapo Hub X!")
-        if ok then LapoHub:Notify({ title="Webhook", content="Enviado com sucesso!", duration=3 }) end
+        if ok then LapoX:Notify({ title="Webhook", content="Enviado com sucesso!", duration=3 }) end
     end,
 })
 
-LapoHub:AddButton("🔗 Webhook", {
+LapoX:AddButton("🔗 Webhook", {
     text = "📊 Enviar Stats",
     callback = function()
         local data = GetReturnData()
-        if not data then LapoHub:Notify({ title="Error", content="Falha ao carregar dados", duration=4 }); return end
+        if not data then LapoX:Notify({ title="Error", content="Falha ao carregar dados", duration=4 }); return end
 
         local function safe(t, key, fallback)
             if not t or type(t) ~= "table" then return fallback end
@@ -1295,44 +1327,52 @@ LapoHub:AddButton("🔗 Webhook", {
         }
 
         local ok = SendWebhook({embeds={embed}})
-        if ok then LapoHub:Notify({ title="Webhook", content="Stats enviadas!", duration=3 }) end
+        if ok then LapoX:Notify({ title="Webhook", content="Stats enviadas!", duration=3 }) end
     end,
 })
 
-LapoHub:AddButton("🔗 Webhook", {
+LapoX:AddButton("🔗 Webhook", {
     text = "🧪 Enviar Log de Teste",
     callback = function()
         if webhookURL == "" then
-            LapoHub:Notify({ title="Error", content="Por favor defina a URL primeiro!", duration=3 })
+            LapoX:Notify({ title="Error", content="Por favor defina a URL primeiro!", duration=3 })
             return
         end
         local plName = "Player"
         pcall(function() plName = LP.Name or plName end)
         local embed = {
             title = "Auto Melhor Trait em Todas (Teste)",
-            description = "Log de teste enviado pelo Lapo Hub",
+            description = "Log de teste enviado pelo Lapo Hub X",
             color = 0x58D68D,
             fields = {
                 { name = "Fila", value = "1/4", inline = true },
                 { name = "Unidade (atual)", value = plName, inline = true },
                 { name = "Trait Atual", value = "The Honored One", inline = false }
             },
-            footer = { text = "Logs do Lapo Hub (teste)" },
+            footer = { text = "Logs do Lapo Hub X (teste)" },
             timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
         }
         SendWebhook({ embeds = { embed } })
     end,
 })
 
-LapoHub:AddToggle("🔗 Webhook", {
+LapoX:AddToggle("🔗 Webhook", {
     text = "🔔 Ativar Logs Automáticos",
     default = false,
     callback = function(state)
-        webhookEnabled = state
         WEBHOOK_LOGS_ENABLED = state
-        LapoHub:Notify({ title="Logs", content=state and "Ativados" or "Desativados", duration=2 })
+        LapoX:Notify({ title="Logs", content=state and "Ativados" or "Desativados", duration=2 })
     end,
 })
+
+local function formatStat(name, x)
+    local v = tonumber(x) or 1
+    if math.abs(v - 1.5) < 0.01 then
+        if name == "COST" then return "85%" end
+        return "115%"
+    end
+    return tostring(math.floor(v * 100)) .. "%"
+end
 
 local oldInvoke = SafeInvoke
 SafeInvoke = function(remote, ...)
@@ -1349,15 +1389,6 @@ SafeInvoke = function(remote, ...)
                 local sta = tonumber(mods.STA) or 1
                 local cost = tonumber(mods.COST) or 1
 
-                local function formatStat(name, x)
-                    local v = tonumber(x) or 1
-                    if math.abs(v - 1.5) < 0.01 then
-                        if name == "COST" then return "85%" end
-                        return "115%"
-                    end
-                    return tostring(math.floor(v * 100)) .. "%"
-                end
-
                 local embed = {
                     title = "Santo Graal Usado",
                     description = "Um Santo Graal foi usado em uma unidade",
@@ -1368,8 +1399,8 @@ SafeInvoke = function(remote, ...)
                         { name = "Limit Break", value = tostring(unit.LimitBreak or "N/A"), inline = true },
                         { name = "Atributos Atuais", value = string.format("ATK: %s · SPA: %s · CUSTO: %s", formatStat("ATK", atk), formatStat("STA", sta), formatStat("COST", cost)), inline = false }
                     },
-                    footer = { text = "Logs do Lapo Hub" },
-                    timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+                    footer = { text = "Logs do Lapo Hub X" },
+                    timestamp = (pcall(os.date, "!%Y-%m-%dT%H:%M:%SZ") and os.date("!%Y-%m-%dT%H:%M:%SZ") or "")
                 }
                 SendWebhook({ embeds = { embed } })
             end
@@ -1386,8 +1417,8 @@ SafeInvoke = function(remote, ...)
                         { name = "Unidade", value = tostring(unitName), inline = true },
                         { name = "Nova Trait", value = tostring(rolled), inline = true }
                     },
-                    footer = { text = "Logs do Lapo Hub" },
-                    timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+                    footer = { text = "Logs do Lapo Hub X" },
+                    timestamp = (pcall(os.date, "!%Y-%m-%dT%H:%M:%SZ") and os.date("!%Y-%m-%dT%H:%M:%SZ") or "")
                 }
                 SendWebhook({ embeds = { embed } })
             end
@@ -1410,14 +1441,6 @@ SafeFire = function(remote, ...)
             local sta = tonumber(mods.STA) or 1
             local cost = tonumber(mods.COST) or 1
 
-            local function formatStat(name, x)
-                local v = tonumber(x) or 1
-                if math.abs(v - 1.5) < 0.01 then
-                    if name == "COST" then return "85%" end
-                    return "115%"
-                end
-                return tostring(math.floor(v * 100)) .. "%"
-            end
 
             local embed = {
                 title = "Santo Graal Usado",
@@ -1429,7 +1452,7 @@ SafeFire = function(remote, ...)
                     { name = "Limit Break", value = tostring(unit.LimitBreak or "N/A"), inline = true },
                     { name = "Atributos Atuais", value = string.format("ATK: %s · STA: %s · CUSTO: %s", formatStat("ATK", atk), formatStat("STA", sta), formatStat("COST", cost)), inline = false }
                 },
-                footer = { text = "Logs do Lapo Hub" },
+                footer = { text = "Logs do Lapo Hub X" },
                 timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
             }
             SendWebhook({ embeds = { embed } })
@@ -1438,9 +1461,9 @@ SafeFire = function(remote, ...)
     return result
 end
 
-LapoHub:AddSeparator("🔗 Webhook")
+LapoX:AddSeparator("🔗 Webhook")
 
-LapoHub:SetLoadingProgress(0.95, "Finalizando...")
+LapoX:SetLoadingProgress(0.95, "Finalizando...")
 updateTokenDisplay()
 if selectedUnit and selectedUnit ~= "Nenhuma unit encontrada" then
     refreshUnitDisplay(selectedUnit)
@@ -1448,12 +1471,12 @@ end
 
 -- Encerra a tela de load: sai do batch mode, monta a UI uma única vez
 -- e faz o fade out. O Notify aparece quando a UI já está visível.
-LapoHub:FinishLoading(function()
-    LapoHub:Notify({
+LapoX:FinishLoading(function()
+    LapoX:Notify({
         title   = "⚡ Lapo Hub X",
         content = "Hub carregado! " .. #UNITS .. " units\n8 tabs | Data version: " .. dataVersion,
         duration = 5,
     })
 end)
 
-return LapoHub
+return LapoX
